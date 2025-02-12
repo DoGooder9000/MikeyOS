@@ -31,10 +31,14 @@ print: ; Put the address of the line in SI
 printchar:
 	; AL should hold the character
 
+	push ax
+
 	mov al, 'M'
 
 	mov ah, 0x0E	; Move 0x02 into AH
 	int 0x10	; Trigger interrupt 0x10
+
+	pop ax
 
 	ret		; Return
 
