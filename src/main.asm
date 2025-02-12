@@ -126,11 +126,15 @@ LBAtoCHS:
 
 	mov ax, si			; Move the LBA into AX
 
+	xor dx, dx			; Set DX to 0
+
 	div bx				; LBA / ( HPC * SPT )
 
 	and ax, 0x00FF			; Keep only the lower 8 bits of AX
 
 	mov cx, ax			; Move the result ( cylinder value ) into cx
+
+	push CX				; Push CX to the Stack just in case
 
 	; Cylinder is done
 
@@ -142,15 +146,21 @@ LBAtoCHS:
 
 	mov bx, SectorsPerTrack		; Set BX to SPT
 
+	xor dx, dx			; Set DX to 0
+
 	div bx				; Divide AX ( LBA ) by BX ( SPT )
 
 	and ax, 0x00FF			; We only want the bottom 8 bits ( the result )
 
 	mov bx, HeadsPerCylinder	; Set BX to the HeadsPerCylinder
 
+	xor dx, dx			; Set DX to 0
+
 	div bx				; Divide ( or in our case modulus ) AX ( LBA / SPT ) and BX ( HPC )
 
 	mov dh, ah			; We only want the remainder ( Head Value ) which is in AH ( the top 8 bits of AX )
+
+	push dx				; Push DX to the Stack just in case
 
 	; Head is done
 
@@ -162,6 +172,8 @@ LBAtoCHS:
 
 	mov bx, SectorsPerTrack		; Move SPT into BX
 
+	xor dx, dx			; Set DX to 0
+
 	div bx				; Divide ( modulus ) AX ( LBA ) by BX ( SPT )
 
 	and ax, 0xFF00			; Keep only the upper 8 bits of AX ( modulus )
@@ -172,9 +184,15 @@ LBAtoCHS:
 
 	inc di				; Add one to DI
 
+	push di				; Push DI to the Stack just in case
+
 	; Sectors are done
 
 	; Cleanup time
+
+	pop di				; Pop DI
+	pop dx				; Pop DX
+	pop cx				; Pop CX
 
 	pop si				; Pop SI off the Stack
 	pop bx				; Pop BX off the Stack
