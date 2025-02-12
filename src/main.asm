@@ -31,14 +31,10 @@ print: ; Put the address of the line in SI
 printchar:
 	; AL should hold the character
 
-	push ax
-
 	mov al, 'M'
 
 	mov ah, 0x0E	; Move 0x02 into AH
 	int 0x10	; Trigger interrupt 0x10
-
-	pop ax
 
 	ret		; Return
 
@@ -65,16 +61,12 @@ main:
 
 	; Stack Pointer
 	; The Stack Pointer points to the top of the stack
-	; The Stack grows downwards, so put it at the start of the program
+	; The stack grows downwards, so put it at the start of the program
 
 	mov sp, 0x7C00	; Stack Point to top of program
 
-	; Print "Hello, World!"
-
 	mov si, msg
 	call print
-
-	; Read Disk Sectors
 
 	mov ax, 62
 
@@ -84,18 +76,14 @@ main:
 	mov al, 0x01
 	mov dl, 0x00
 
-	xor bx, bx
+	mov bx, 0
 	mov es, bx
 
 	mov bx, 0x7E00
 
-	mov cx, 1
-	mov dh, 1
-	mov di, 10
-
 	call ReadSectorsFromDrive
 
-	mov si, 0x7E00
+	mov si, msg
 	call print
 
 	jmp haltloop
@@ -138,15 +126,11 @@ LBAtoCHS:
 
 	mov ax, si			; Move the LBA into AX
 
-	xor dx, dx			; Set DX to 0 just in case
-
 	div bx				; LBA / ( HPC * SPT )
 
-	and ax, 0xFF			; Keep only the lower 8 bits of AX
+	and ax, 0x00FF			; Keep only the lower 8 bits of AX
 
 	mov cx, ax			; Move the result ( cylinder value ) into cx
-
-	push cx				; Push CX to the Stack just in case
 
 	; Cylinder is done
 
@@ -158,21 +142,15 @@ LBAtoCHS:
 
 	mov bx, SectorsPerTrack		; Set BX to SPT
 
-	xor dx, dx			; Set DX to 0 just in case
-
 	div bx				; Divide AX ( LBA ) by BX ( SPT )
 
 	and ax, 0x00FF			; We only want the bottom 8 bits ( the result )
 
 	mov bx, HeadsPerCylinder	; Set BX to the HeadsPerCylinder
 
-	xor dx, dx			; Set DX to 0 just in case
-
 	div bx				; Divide ( or in our case modulus ) AX ( LBA / SPT ) and BX ( HPC )
 
 	mov dh, ah			; We only want the remainder ( Head Value ) which is in AH ( the top 8 bits of AX )
-
-	push dx				; Push DX to the Stack just in case
 
 	; Head is done
 
@@ -184,8 +162,6 @@ LBAtoCHS:
 
 	mov bx, SectorsPerTrack		; Move SPT into BX
 
-	xor dx, dx			; Set DX to 0 just in case
-
 	div bx				; Divide ( modulus ) AX ( LBA ) by BX ( SPT )
 
 	and ax, 0xFF00			; Keep only the upper 8 bits of AX ( modulus )
@@ -196,15 +172,9 @@ LBAtoCHS:
 
 	inc di				; Add one to DI
 
-	push di				; Push DI to the Stack just in case
-
 	; Sectors are done
 
 	; Cleanup time
-
-	pop di				; Pop Sector value
-	pop dx				; Pop Head value
-	pop cx				; Pop Cylinder value
 
 	pop si				; Pop SI off the Stack
 	pop bx				; Pop BX off the Stack
@@ -332,12 +302,11 @@ SectorsPerTrack: db 18
 
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
-Halted:	db "Halted", ENDL, 0
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
 
 dw 0xAA55
 
-times 512 db 'm'
-db 0
+
+times 1024 db 'M'
