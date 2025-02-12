@@ -10,5 +10,8 @@ $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/main.bin
 $(BUILD_DIR)/main.bin: $(SRC_DIR)/main.asm
 	$(ASM) -f bin -o $(BUILD_DIR)/main.bin $(SRC_DIR)/main.asm
 
-run:
-	qemu-system-i386 -nographic -fda build/floppy.img
+nogui:
+	qemu-system-i386 -nographic -fda $(BUILD_DIR)/floppy.img
+
+gui:
+	qemu-system-i386 -fda $(BUILD_DIR)/floppy.img
