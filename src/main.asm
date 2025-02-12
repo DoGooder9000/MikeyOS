@@ -83,9 +83,9 @@ main:
 	; mov dh, 0	; Head
 	; mov cl, 2	; Sector
 
-	mov ah, 0x02	; Interrupt funciton 0x02
-	mov al, 0x01	; Sectors to read ( 1 )
-	mov dl, 0x00
+	mov ah, 0x02			; Interrupt funciton 0x02
+	mov al, 0x01			; Sectors to read ( 1 )
+	mov dl, [DriveNumber]	; The Drive number to read from
 
 	xor bx, bx
 	mov es, bx
