@@ -4,6 +4,8 @@ bits 16
 %define ENDL 0x0D, 0x0A
 
 start:
+	mov [DriveNumber], dx	; BIOS puts the drive number in DX, so move it into a permanent memory location
+
 	jmp main
 
 print: ; Put the address of the line in SI
@@ -46,7 +48,7 @@ main:
 	; Set all the segment registers to 0 ( boot sector )
 	; Can't write directly to most of the registers	
 
-	mov ax, 0x00	; Set AX to 0
+	xor ax, ax	; Set AX to 0
 
 	; Data segment registers
 
@@ -72,22 +74,27 @@ main:
 	mov si, msg
 	call print
 
-	mov ax, 62
+	mov ax, 1
 
 	call LBAtoCHS
+	call CHStoRightPlace
 
-	mov ah, 0x02
-	mov al, 0x01
+	; mov ch, 0	; Cylinder
+	; mov dh, 0	; Head
+	; mov cl, 2	; Sector
+
+	mov ah, 0x02	; Interrupt funciton 0x02
+	mov al, 0x01	; Sectors to read ( 1 )
 	mov dl, 0x00
 
-	mov bx, 0
+	xor bx, bx
 	mov es, bx
 
-	mov bx, 0x7E00
+	mov bx, 0x7E00	; ( ES:BX ) ( 0 : 0x7E00 )
 
 	call ReadSectorsFromDrive
 
-	mov si, msg
+	mov si, 0x7E00
 	call print
 
 	jmp haltloop
@@ -121,8 +128,8 @@ LBAtoCHS:
 
 	mov si, ax			; Put the LBA into SI from AX
 
-	mov ax, HeadsPerCylinder	; Put the HPC into AX
-	mov bx, SectorsPerTrack		; Put the SPT into BX
+	mov ax, [HeadsPerCylinder]	; Put the HPC into AX
+	mov bx, [SectorsPerTrack]		; Put the SPT into BX
 
 	mul bx				; Multiply HPC * SPT
 
@@ -148,7 +155,7 @@ LBAtoCHS:
 
 	mov ax, si			; Move LBA into AX from SI
 
-	mov bx, SectorsPerTrack		; Set BX to SPT
+	mov bx, [SectorsPerTrack]		; Set BX to SPT
 
 	xor dx, dx			; Set DX to 0
 
@@ -156,13 +163,15 @@ LBAtoCHS:
 
 	and ax, 0x00FF			; We only want the bottom 8 bits ( the result )
 
-	mov bx, HeadsPerCylinder	; Set BX to the HeadsPerCylinder
+	mov bx, [HeadsPerCylinder]	; Set BX to the HeadsPerCylinder
 
 	xor dx, dx			; Set DX to 0
 
 	div bx				; Divide ( or in our case modulus ) AX ( LBA / SPT ) and BX ( HPC )
 
-	mov dh, ah			; We only want the remainder ( Head Value ) which is in AH ( the top 8 bits of AX )
+	mov dh, dl			; Move the Modulus result ( stored in DL ) to DH ( where the Head value is stored )
+
+	xor dl, dl			; Set DL to 0
 
 	push dx				; Push DX to the Stack just in case
 
@@ -174,15 +183,13 @@ LBAtoCHS:
 
 	mov ax, si			; Move LBA from SI into AX
 
-	mov bx, SectorsPerTrack		; Move SPT into BX
+	mov bx, [SectorsPerTrack]		; Move SPT into BX
 
 	xor dx, dx			; Set DX to 0
 
 	div bx				; Divide ( modulus ) AX ( LBA ) by BX ( SPT )
 
-	and ax, 0xFF00			; Keep only the upper 8 bits of AX ( modulus )
-
-	shr ax, 8			; Shift AX by 8 bits right
+	mov ax, dx			; Modulus result is stored in DX, so move it to AX
 
 	mov di, ax			; Move the reminder into DI
 
@@ -202,6 +209,35 @@ LBAtoCHS:
 	pop bx				; Pop BX off the Stack
 
 	ret				; Return
+
+CHStoRightPlace:
+	; Put HEAD in DH
+
+	; PUT CYLINDER IN 	CX
+	; PUT SECTOR IN 	DI
+
+	push ax		; Push AX onto the Stack so we can use it as an intermediary
+
+	mov ax, cx	; Copy the Cylinder Value into AX from CX
+
+	and cx, 0xFF	; AND CX with 255 ( This gets the low 8 bits )
+	shl cx, 8	; Shift CX left by 8, into CH
+	
+	; Next, move Sector into the right place
+
+	and ax, 0x300	; AND AX with 768 ( 0b 0000001100000000 ) ( This gets the high 2 bits )
+	shr ax, 2	; Shift AX right by 2
+
+	; Or the Cylinder and Sector together
+
+	or cx, ax	; OR CX and AX
+	
+	or cx, di	; OR CX and DI to get the cylinder and sector together
+
+	pop ax		; Pop the previous value of AX from the stack
+
+	
+	ret			; Return
 
 
 ResetDiskSystem:
@@ -244,36 +280,9 @@ ReadSectorsFromDrive:
 	; Cylinder	= 0000000 00
 	; Sector	=           000000
 
-	; PUT CYLINDER IN 	CX
-	; PUT SECTOR IN 	DI
-
 	; Addressing of Buffer should guarantee that the complete buffer is inside the given segment
 	; ( BX + size_of_buffer ) <= 0x10000
 
-	
-	; First, move Cylinder into the proper place
-
-	push ax		; Push AX onto the Stack so we can use it as an intermediary
-
-	mov ax, cx	; Copy the Cylinder Value into AX from CX
-
-	and cx, 0xFF	; AND CX with 255 ( This gets the low 8 bits )
-	shl cx, 8	; Shift CX left by 8, into CH
-	
-	; Next, move Sector into the right place
-
-	and ax, 0x300	; AND AX with 768 ( 0b 0000001100000000 ) ( This gets the high 2 bits )
-	shr ax, 2	; Shift AX right by 2
-
-	; Or the Cylinder and Sector together
-
-	or cx, ax	; OR CX and AX
-	
-	or cx, di	; OR CX and DI to get the cylinder and sector together
-
-	pop ax		; Pop the previous value of AX from the stack	
-
-	
 	; Start of calling the actual interrupt
 
 	mov ah, 0x02	; Make sure 0x02 is in AH
@@ -322,6 +331,8 @@ msg: db "Hello, World!", ENDL, 0
 HeadsPerCylinder: db 2
 SectorsPerTrack: db 18
 
+DriveNumber: db 0x00
+
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
 
@@ -331,4 +342,4 @@ times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 dw 0xAA55
 
 
-times 1024 db 'M'
+db "Can you read this", ENDL, 0

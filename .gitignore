@@ -1,1 +1,4 @@
 /test
+bochs_config
+bochs_debug.bat
+bx_enh_dbg.ini
