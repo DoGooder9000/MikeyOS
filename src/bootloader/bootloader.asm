@@ -94,8 +94,7 @@ main:
 
 	call ReadSectorsFromDrive
 
-	mov si, 0x7E00
-	call print
+	jmp 0x7E00
 
 	jmp haltloop
 	
