@@ -339,6 +339,3 @@ times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
 
 dw 0xAA55
-
-
-db "Can you read this", ENDL, 0

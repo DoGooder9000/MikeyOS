@@ -1,11 +1,3 @@
-ifeq ($(OS), Windows_NT)
-	DD = "C:\Users\rogne\Downloads\dd-0.6beta3\dd.exe"
-
-else
-	DD = dd
-
-endif
-
 ASM = nasm
 
 SRC_DIR = src
@@ -15,13 +7,12 @@ BUILD_DIR = build
 
 .PHONY: floppy bootloader kernel clean always
 
-
 $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/bootloader.bin $(BUILD_DIR)/kernel.bin
-	$(DD) if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880
+	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880
 
-	$(DD) if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=0 conv=notrunc
+	dd if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=0 conv=notrunc
 
-	$(DD) if=$(BUILD_DIR)/kernel.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=1 conv=notrunc
+	dd if=$(BUILD_DIR)/kernel.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=1 conv=notrunc
 
 	truncate -s 1440K $(BUILD_DIR)/floppy.img
 
