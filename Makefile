@@ -1,5 +1,12 @@
+ifeq ($(OS), Windows_NT)
+	DD = "C:\Users\rogne\Downloads\dd-0.6beta3\dd.exe"
+
+else
+	DD = dd
+
+endif
+
 ASM = nasm
-DD = "C:\Users\rogne\Downloads\dd-0.6beta3\dd.exe"
 
 SRC_DIR = src
 BOOT_DIR = $(SRC_DIR)/bootloader
