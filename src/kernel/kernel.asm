@@ -1,7 +1,8 @@
-org 0x7C00
 bits 16
 
 %define ENDL 0x0D, 0x0A
+
+db "can u read this", ENDL, 0
 
 start:
 	mov [DriveNumber], dx	; BIOS puts the drive number in DX, so move it into a permanent memory location

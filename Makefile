@@ -1,14 +1,42 @@
 ASM = nasm
+DD = "C:\Users\rogne\Downloads\dd-0.6beta3\dd.exe"
 
 SRC_DIR = src
+BOOT_DIR = $(SRC_DIR)/bootloader
+KERN_DIR = $(SRC_DIR)/kernel
 BUILD_DIR = build
 
-$(BUILD_DIR)/floppy.img: $(BUILD_DIR)/main.bin
-	cp $(BUILD_DIR)/main.bin $(BUILD_DIR)/floppy.img
+.PHONY: floppy bootloader kernel clean always
+
+
+$(BUILD_DIR)/floppy.img: $(BUILD_DIR)/bootloader.bin $(BUILD_DIR)/kernel.bin
+	$(DD) if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880
+
+	$(DD) if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=0 conv=notrunc
+
+	$(DD) if=$(BUILD_DIR)/kernel.bin of=$(BUILD_DIR)/floppy.img bs=512 seek=1 conv=notrunc
+
 	truncate -s 1440K $(BUILD_DIR)/floppy.img
 
-$(BUILD_DIR)/main.bin: $(SRC_DIR)/main.asm
-	$(ASM) -f bin -o $(BUILD_DIR)/main.bin $(SRC_DIR)/main.asm
+$(BUILD_DIR)/bootloader.bin: $(BOOT_DIR)/bootloader.asm
+	$(ASM) -f bin -o $(BUILD_DIR)/bootloader.bin $(BOOT_DIR)/bootloader.asm
+
+
+$(BUILD_DIR)/kernel.bin: $(KERN_DIR)/kernel.asm
+	$(ASM) -f bin -o $(BUILD_DIR)/kernel.bin $(KERN_DIR)/kernel.asm
+
+floppy: $(BUILD_DIR)/floppy.img
+
+bootloader: $(BUILD_DIR)/bootloader.bin
+
+kernel: $(BUILD_DIR)/kernel.bin
+
+always:
+	mkdir $(BUILD_DIR)
+
+clean:
+	rm $(BUILD_DIR)/floppy.img
+	rm $(BUILD_DIR)/*.bin
 
 nogui:
 	qemu-system-i386 -nographic -fda $(BUILD_DIR)/floppy.img
