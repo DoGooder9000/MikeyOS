@@ -10,7 +10,7 @@ BUILD_DIR = build
 $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/bootloader.bin $(BUILD_DIR)/kernel.bin
 	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880				# Fills a file with 1.44 MB of zeros
 
-	mkfs.fat -F 12 -n "MikeyOS" $(BUILD_DIR)/floppy.img							# Formats the file to Fat 12
+	mkfs.fat -F 12 -n "MIKEYOS" $(BUILD_DIR)/floppy.img							# Formats the file to Fat 12
 
 	dd if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/floppy.img conv=notrunc	# Moves the bootloader.bin into the start of the file
 
