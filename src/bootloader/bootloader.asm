@@ -33,7 +33,7 @@ SYS_IDEN_STR:	db "FAT12   "
 
 
 start:
-	mov [DriveNumber], dx	; BIOS puts the drive number in DX, so move it into a permanent memory location
+	mov [DRIVE_NUM], dx	; BIOS puts the drive number in DX, so move it into a permanent memory location
 
 	jmp main
 
@@ -113,8 +113,8 @@ main:
 	; mov cl, 2	; Sector
 
 	mov ah, 0x02			; Interrupt funciton 0x02
-	mov al, 0x01			; Sectors to read ( 1 )
-	mov dl, [DriveNumber]	; The Drive number to read from
+	mov al, 63				; Sectors to read ( 1 )
+	mov dl, [DRIVE_NUM]		; The Drive number to read from
 
 	xor bx, bx
 	mov es, bx
@@ -123,7 +123,10 @@ main:
 
 	call ReadSectorsFromDrive
 
-	jmp 0x7E00
+	jmp 0xBE00
+
+	mov si, Halted
+	call print
 
 	jmp haltloop
 	
@@ -359,10 +362,9 @@ msg: db "Hello, World!", ENDL, 0
 HeadsPerCylinder: db 2
 SectorsPerTrack: db 18
 
-DriveNumber: db 0x00
-
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
+Halted: db "Halted", ENDL, 0
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
