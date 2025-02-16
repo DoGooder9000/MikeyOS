@@ -62,62 +62,62 @@ uint32_t g_RootDirectoryEnd;
 
 int main(int argc, char* argv[]){
 	if (argc < 3) {
-        printf("Syntax: %s <disk image> <file name>\n", argv[0]);
-        return -1;
-    }
+		printf("Syntax: %s <disk image> <file name>\n", argv[0]);
+		return -1;
+	}
 
-    FILE* disk = fopen(argv[1], "rb");
-    if (!disk) {
-        printf("Cannot open disk image %s!\n", argv[1]);
-        return -1;
-    }
+	FILE* disk = fopen(argv[1], "rb");
+	if (!disk) {
+		printf("Cannot open disk image %s!\n", argv[1]);
+		return -1;
+	}
 
-    if (!readBootSector(disk)) {
-        printf("Could not read boot sector!\n");
-        return -2;
-    }
+	if (!readBootSector(disk)) {
+		printf("Could not read boot sector!\n");
+		return -2;
+	}
 
-    if (!readFat(disk)) {
-        printf("Could not read FAT!\n");
-        free(g_Fat);
-        return -3;
-    }
+	if (!readFat(disk)) {
+		printf("Could not read FAT!\n");
+		free(g_Fat);
+		return -3;
+	}
 
-    if (!readRootDirectory(disk)) {
-        printf("Could not read FAT!\n");
-        free(g_Fat);
-        free(g_RootDirectory);
-        return -4;
-    }
+	if (!readRootDirectory(disk)) {
+		printf("Could not read FAT!\n");
+		free(g_Fat);
+		free(g_RootDirectory);
+		return -4;
+	}
 
-    struct DirectoryEntry* fileEntry = findFile(argv[2]);
-    if (!fileEntry) {
-        printf("Could not find file %s!\n", argv[2]);
-        free(g_Fat);
-        free(g_RootDirectory);
-        return -5;
-    }
+	struct DirectoryEntry* fileEntry = findFile(argv[2]);
+	if (!fileEntry) {
+		printf("Could not find file %s!\n", argv[2]);
+		free(g_Fat);
+		free(g_RootDirectory);
+		return -5;
+	}
 
-    uint8_t* buffer = (uint8_t*) malloc(fileEntry->Size + bootsec.BytesPerSector);
-    if (!readFile(fileEntry, disk, buffer)) {
-        printf("Could not read file %s!\n", argv[2]);
-        free(g_Fat);
-        free(g_RootDirectory);
-        free(buffer);
-        return -5;
-    }
+	uint8_t* buffer = (uint8_t*) malloc(fileEntry->Size + bootsec.BytesPerSector);
+	if (!readFile(fileEntry, disk, buffer)) {
+		printf("Could not read file %s!\n", argv[2]);
+		free(g_Fat);
+		free(g_RootDirectory);
+		free(buffer);
+		return -5;
+	}
 
-    for (size_t i = 0; i < fileEntry->Size; i++)
-    {
-        if (isprint(buffer[i])) {putc(buffer[i], stdout);}
-        else printf("<%02x>", buffer[i]);
-    }
-    printf("\n");
+	for (size_t i = 0; i < fileEntry->Size; i++)
+	{
+		if (isprint(buffer[i])) {putc(buffer[i], stdout);}
+		else printf("<%02x>", buffer[i]);
+	}
+	printf("\n");
 
-    free(buffer);
-    free(g_Fat);
-    free(g_RootDirectory);
-    return 0;
+	free(buffer);
+	free(g_Fat);
+	free(g_RootDirectory);
+	return 0;
 }
 
 bool readBootSector(FILE* disk){
@@ -125,10 +125,10 @@ bool readBootSector(FILE* disk){
 }
 
 bool readSectors(FILE* disk, uint32_t lba, uint32_t count, void* bufferOut){
-    bool ok = true;
-    ok = ok && (fseek(disk, lba * bootsec.BytesPerSector, SEEK_SET) == 0);
-    ok = ok && (fread(bufferOut, bootsec.BytesPerSector, count, disk) == count);
-    return ok;
+	bool ok = true;
+	ok = ok && (fseek(disk, lba * bootsec.BytesPerSector, SEEK_SET) == 0);
+	ok = ok && (fread(bufferOut, bootsec.BytesPerSector, count, disk) == count);
+	return ok;
 }
 
 bool readFat(FILE* disk){
