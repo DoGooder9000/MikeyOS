@@ -5,7 +5,12 @@ BOOT_DIR = $(SRC_DIR)/bootloader
 KERN_DIR = $(SRC_DIR)/kernel
 BUILD_DIR = build
 
-.PHONY: floppy bootloader kernel clean always
+TOOLS = tools
+FAT-TOOLS = $(TOOLS)/fat
+
+FAT-TOOLS-FILES = $(wildcard $(FAT-TOOLS)/*.c)
+
+.PHONY: floppy bootloader kernel clean nogui gui wsl tools
 
 $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/bootloader.bin $(BUILD_DIR)/kernel.bin
 	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880				# Fills a file with 1.44 MB of zeros
@@ -27,18 +32,27 @@ $(BUILD_DIR)/kernel.bin: $(KERN_DIR)/kernel.asm
 
 	$(ASM) -f bin -o $(BUILD_DIR)/kernel.bin $(KERN_DIR)/kernel.asm
 
+$(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
+	gcc -o $@ $(patsubst %.exe, %.c, $@)
+
+$(patsubst %.c, %.o, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
+	gcc -o $@ $(patsubst %.o, %.c, $@)
+
 floppy: $(BUILD_DIR)/floppy.img
 
 bootloader: $(BUILD_DIR)/bootloader.bin
 
 kernel: $(BUILD_DIR)/kernel.bin
 
-always:
-	mkdir $(BUILD_DIR)
+tools: fat-tools
+
+fat-tools: $(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)) $(patsubst %.c, %.o, $(FAT-TOOLS-FILES))
 
 clean:
-	rm $(BUILD_DIR)/floppy.img
-	rm $(BUILD_DIR)/*.bin
+	rm -f $(BUILD_DIR)/floppy.img
+	rm -f $(BUILD_DIR)/*.bin
+	rm -f $(FAT-TOOLS)/*.o
+	rm -f $(FAT-TOOLS)/*.exe
 
 nogui:
 	qemu-system-i386 -nographic -fda $(BUILD_DIR)/floppy.img
