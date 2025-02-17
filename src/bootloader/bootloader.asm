@@ -33,47 +33,8 @@ SYS_IDEN_STR:	db "FAT12   "
 
 
 start:
-	mov [DRIVE_NUM], dx	; BIOS puts the drive number in DX, so move it into a permanent memory location
+	mov [DRIVE_NUM], dl	; BIOS puts the drive number in DX, so move it into a permanent memory location
 
-	jmp main
-
-print: ; Put the address of the line in SI
-	push ax		; Store AX on the stack
-	push si		; Store SI on the stack	
-	
-	jmp .printloop	; Goto .printloop
-
-.printloop:
-	lodsb		; Load the byte at DS:SI into AL ( lower half of AX )
-	
-	or al, al	; Check if AL is 0 ( End of the string )
-	jz .printdone	; If AL is 0 jmp to .printdone
-
-	mov ah, 0x0E	; Set the interrupt code for TTY Character Output
-	int 0x10	; Call interrupt 0x10
-
-	jmp .printloop
-
-.printdone:
-	pop si		; Put the previous value of SI back into SI
-	pop ax		; Put the previous value of AX back into AX
-	ret		; Return
-
-printchar:
-	; AL should hold the character
-
-	push ax
-
-	mov al, 'M'
-
-	mov ah, 0x0E	; Move 0x02 into AH
-	int 0x10	; Trigger interrupt 0x10
-
-	pop ax
-
-	ret		; Return
-
-main:
 	; Set all the segment registers to 0 ( boot sector )
 	; Can't write directly to most of the registers	
 
@@ -100,13 +61,40 @@ main:
 
 	mov sp, 0x7C00	; Stack Point to top of program
 
-	mov si, msg
-	call print
+	; Perform a far jump to make sure that we are at Code Segment 0
+	; Retf ( Return Far ) takes the Instruction Pointer and Code Segment Register from the stack
+	; We need to push 0 ( for the code segment reg ) and the address to jump to
 
+	push es			; Push 0 to the Stack
+	push word main	; Push where we want to jump to ( main )
+	retf			; Far jump which gets us to CS 0
+
+print: ; Put the address of the line in SI
+	push ax		; Store AX on the stack
+	push si		; Store SI on the stack	
+	
+	jmp .printloop	; Goto .printloop
+
+.printloop:
+	lodsb		; Load the byte at DS:SI into AL ( lower half of AX )
+	
+	or al, al	; Check if AL is 0 ( End of the string )
+	jz .printdone	; If AL is 0 jmp to .printdone
+
+	mov ah, 0x0E	; Set the interrupt code for TTY Character Output
+	int 0x10	; Call interrupt 0x10
+
+	jmp .printloop
+
+.printdone:
+	pop si		; Put the previous value of SI back into SI
+	pop ax		; Put the previous value of AX back into AX
+	ret		; Return
+
+main:
 	mov ax, 1
 
 	call LBAtoCHS
-	call CHStoRightPlace
 
 	; mov ch, 0	; Cylinder
 	; mov dh, 0	; Head
@@ -124,9 +112,6 @@ main:
 	call ReadSectorsFromDrive
 
 	jmp 0xBE00
-
-	mov si, Halted
-	call print
 
 	jmp haltloop
 	
@@ -159,8 +144,8 @@ LBAtoCHS:
 
 	mov si, ax			; Put the LBA into SI from AX
 
-	mov ax, [HeadsPerCylinder]	; Put the HPC into AX
-	mov bx, [SectorsPerTrack]		; Put the SPT into BX
+	mov ax, [NUM_HEADS]		; Put the HPC into AX
+	mov bx, [SEC_PER_TRCK]	; Put the SPT into BX
 
 	mul bx				; Multiply HPC * SPT
 
@@ -186,7 +171,7 @@ LBAtoCHS:
 
 	mov ax, si			; Move LBA into AX from SI
 
-	mov bx, [SectorsPerTrack]		; Set BX to SPT
+	mov bx, [SEC_PER_TRCK]	; Set BX to SPT
 
 	xor dx, dx			; Set DX to 0
 
@@ -194,7 +179,7 @@ LBAtoCHS:
 
 	and ax, 0x00FF			; We only want the bottom 8 bits ( the result )
 
-	mov bx, [HeadsPerCylinder]	; Set BX to the HeadsPerCylinder
+	mov bx, [NUM_HEADS]	; Set BX to the HeadsPerCylinder
 
 	xor dx, dx			; Set DX to 0
 
@@ -214,7 +199,7 @@ LBAtoCHS:
 
 	mov ax, si			; Move LBA from SI into AX
 
-	mov bx, [SectorsPerTrack]		; Move SPT into BX
+	mov bx, [SEC_PER_TRCK]	; Move SPT into BX
 
 	xor dx, dx			; Set DX to 0
 
@@ -239,9 +224,8 @@ LBAtoCHS:
 	pop si				; Pop SI off the Stack
 	pop bx				; Pop BX off the Stack
 
-	ret				; Return
+	; Convert to proper places expected by the BIOS
 
-CHStoRightPlace:
 	; Put HEAD in DH
 
 	; PUT CYLINDER IN 	CX
@@ -269,7 +253,6 @@ CHStoRightPlace:
 
 	
 	ret			; Return
-
 
 ResetDiskSystem:
 	; Parameters
@@ -322,7 +305,6 @@ ReadSectorsFromDrive:
 
 	jc DiskError	; If the carry flag was set ( There was an Error ), jump to DiskError
 
-
 	ret		; Return
 
 GetStatusOfLastDriveOperation:
@@ -351,16 +333,9 @@ DiskError:
 
 	; TODO - Add error code printing
 
-	; Halt the OS
-
-	hlt				; Halt
-
 	jmp haltloop
 
-msg: db "Hello, World!", ENDL, 0
-
-HeadsPerCylinder: db 2
-SectorsPerTrack: db 18
+KernelFileName: db "KERNEL  BIN"
 
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0

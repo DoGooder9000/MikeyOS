@@ -39,4 +39,4 @@ print: ; Put the address of the line in SI
 
 	ret			; Return
 
-msg: db "Test, Test", ENDL, 0
+msg: db "Kernel Loaded", ENDL, 0
