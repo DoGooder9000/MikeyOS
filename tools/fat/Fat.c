@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define Byte uint8_t
 #define Word uint16_t
@@ -56,9 +57,10 @@ typedef struct DirectoryEntry_Struct DirectoryEntry;
 
 // FUNCTIONS
 
-bool ReadSectors(FILE* disk, int LBA, int numSectors, Byte* buffer);
+bool ReadSectors(FILE* disk, int LBA, int numSectors, void* buffer);
 bool ReadFileAllocationTable(FILE* disk);
-bool ReadRootDirectory(FILE* disk, DirectoryEntry* RootDirectoryEntries);
+bool ReadRootDirectory(FILE* disk);
+DirectoryEntry LookupFile(const char* name);
 
 const BootSector bootsec = BootSector_defualt;
 
@@ -70,12 +72,14 @@ const int EntrySize = sizeof(DirectoryEntry); // Should just be 32
 const int RootDirectoryStart = bootsec.NUM_RES_SECT + FATSectorCount;
 const int RootDirectoryByteLength = (bootsec.ROOT_DIR_ENT * EntrySize);
 const int RootDirectorySectorLength = (RootDirectoryByteLength + bootsec.BYTES_PER_SEC - 1) / bootsec.BYTES_PER_SEC; // Rounds up to the nearest whole sector
+const int RootDirectoryPaddedByteLength = RootDirectorySectorLength * bootsec.BYTES_PER_SEC;
 
 Byte* FileAllocationTable = NULL;
+DirectoryEntry* RootDirectory = NULL;
 
 int main(int argc, char* argv[]){
 	if (argc < 3){
-		printf("Argmument format: <Disk Image> <File name (in FAT form)> ");
+		printf("Argmument format: <Disk Image> <File name (in FAT form)>\n");
 		return -1;
 	}
 
@@ -85,20 +89,34 @@ int main(int argc, char* argv[]){
 	FILE* disk = fopen(argv[1], "rb");
 
 	if (!disk){
-		printf("Failed to open the Disk Image");
+		printf("Failed to open the Disk Image\n");
 		return -2;
 	}
 
 	if (!ReadFileAllocationTable(disk)){
-		printf("Failed to read the FAT");
+		printf("Failed to read the FAT\n");
 		free(FileAllocationTable);
 		return -3;
 	}
+
+	if (!ReadRootDirectory(disk)){
+		printf("Failed to read the Root Directory\n");
+		free(FileAllocationTable);
+		free(RootDirectory);
+		return -4;
+	}
+
+	DirectoryEntry entry = LookupFile(argv[2]);
+	
+	printf("Name: %s\n", entry.Name);
+
+	free(FileAllocationTable);
+	free(RootDirectory);
 	
 	return 0;
 }
 
-bool ReadSectors(FILE* disk, int LBA, int numSectors, Byte* buffer){
+bool ReadSectors(FILE* disk, int LBA, int numSectors, void* buffer){
 	// First, we need to set the LBA ( where in the disk the sectors are going to be read from )
 	// Then, we can read the sectors into the buffer, checking along the way.
 
@@ -117,6 +135,17 @@ bool ReadFileAllocationTable(FILE* disk){
 	return ReadSectors(disk, FATStart, FATSectorCount, FileAllocationTable);
 }
 
-bool ReadRootDirectory(FILE* disk, DirectoryEntry* RootDirectoryEntries){
-	;
+bool ReadRootDirectory(FILE* disk){
+	// (DirectoryEntry*) is not needed in C. It is used for code clarity and compatibility with C++.
+	RootDirectory = (DirectoryEntry*) malloc(RootDirectoryPaddedByteLength);
+
+	return ReadSectors(disk, RootDirectoryStart, RootDirectorySectorLength, RootDirectory);
+}
+
+DirectoryEntry LookupFile(const char* name){
+	for (int i = 0; i < bootsec.ROOT_DIR_ENT; i++){
+		if (memcmp(name, RootDirectory[i].Name, 11) == 0){
+			return RootDirectory[i];
+		}
+	}
 }
