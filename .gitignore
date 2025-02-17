@@ -1,5 +1,9 @@
 test/
 build/
+tools/fat/Fat.exe
+tools/fat/Fat.o
+tools/fat/ReadFat.exe
+tools/fat/ReadFat.o
 bochs_config
 bochs_debug.bat
 bx_enh_dbg.ini

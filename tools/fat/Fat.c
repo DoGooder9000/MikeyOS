@@ -7,12 +7,6 @@
 #define Word uint16_t
 #define Double uint32_t
 
-// FUNCTIONS
-
-bool ReadSectors(FILE* disk, int LBA, int numSectors, Byte* buffer);
-bool ReadFileAllocationTable(FILE* disk);
-bool ReadRootDirectory(FILE* disk, DirectoryEntry* RootDirectoryEntries);
-
 // FAT HEADERS
 
 struct BootSector_Struct{
@@ -59,6 +53,12 @@ struct DirectoryEntry_Struct{
 
 typedef struct BootSector_Struct BootSector;
 typedef struct DirectoryEntry_Struct DirectoryEntry;
+
+// FUNCTIONS
+
+bool ReadSectors(FILE* disk, int LBA, int numSectors, Byte* buffer);
+bool ReadFileAllocationTable(FILE* disk);
+bool ReadRootDirectory(FILE* disk, DirectoryEntry* RootDirectoryEntries);
 
 const BootSector bootsec = BootSector_defualt;
 
