@@ -60,7 +60,8 @@ typedef struct DirectoryEntry_Struct DirectoryEntry;
 bool ReadSectors(FILE* disk, int LBA, int numSectors, void* buffer);
 bool ReadFileAllocationTable(FILE* disk);
 bool ReadRootDirectory(FILE* disk);
-DirectoryEntry LookupFile(const char* name);
+DirectoryEntry* LookupFile(const char* name);
+bool ReadFile(FILE* disk, DirectoryEntry* entry, Byte* buffer);
 
 const BootSector bootsec = BootSector_defualt;
 
@@ -73,6 +74,7 @@ const int RootDirectoryStart = bootsec.NUM_RES_SECT + FATSectorCount;
 const int RootDirectoryByteLength = (bootsec.ROOT_DIR_ENT * EntrySize);
 const int RootDirectorySectorLength = (RootDirectoryByteLength + bootsec.BYTES_PER_SEC - 1) / bootsec.BYTES_PER_SEC; // Rounds up to the nearest whole sector
 const int RootDirectoryPaddedByteLength = RootDirectorySectorLength * bootsec.BYTES_PER_SEC;
+const int RootDirectoryEnd = RootDirectoryStart + RootDirectorySectorLength;
 
 Byte* FileAllocationTable = NULL;
 DirectoryEntry* RootDirectory = NULL;
@@ -106,9 +108,16 @@ int main(int argc, char* argv[]){
 		return -4;
 	}
 
-	DirectoryEntry entry = LookupFile(argv[2]);
-	
-	printf("Name: %s\n", entry.Name);
+	DirectoryEntry* entry = LookupFile(argv[2]);
+
+	if (!entry){
+		printf("Couldn't find the file\n");
+		free(FileAllocationTable);
+		free(RootDirectory);
+		return -5;
+	}
+
+	printf("First Cluster: %d\n", entry->FirstClusterLow);
 
 	free(FileAllocationTable);
 	free(RootDirectory);
@@ -142,10 +151,23 @@ bool ReadRootDirectory(FILE* disk){
 	return ReadSectors(disk, RootDirectoryStart, RootDirectorySectorLength, RootDirectory);
 }
 
-DirectoryEntry LookupFile(const char* name){
+DirectoryEntry* LookupFile(const char* name){
 	for (int i = 0; i < bootsec.ROOT_DIR_ENT; i++){
 		if (memcmp(name, RootDirectory[i].Name, 11) == 0){
-			return RootDirectory[i];
+			return &RootDirectory[i];
 		}
 	}
+
+	return NULL;
+}
+
+bool ReadFile(FILE* disk, DirectoryEntry* entry, Byte* buffer){
+	int FirstCluster = entry->FirstClusterLow;
+	int LBA = RootDirectoryEnd + ((FirstCluster - 2) * bootsec.SEC_PER_CLUST);
+
+	bool good = true;
+
+	
+
+	return good;
 }
