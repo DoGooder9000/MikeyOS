@@ -117,10 +117,23 @@ int main(int argc, char* argv[]){
 		return -5;
 	}
 
-	printf("First Cluster: %d\n", entry->FirstClusterLow);
+	Byte* FileBuffer = (Byte*) malloc(entry->Size + bootsec.BYTES_PER_SEC);
+	if (!ReadFile(disk, entry, FileBuffer)){
+		printf("Couldn't read the file\n");
+		free(FileAllocationTable);
+		free(RootDirectory);
+		free(FileBuffer);
+		return -6;
+	}
+
+	for (size_t i=0; i < entry->Size; i++){
+		printf("<%02x>", FileBuffer[i]);
+	}
+	printf("\n");
 
 	free(FileAllocationTable);
 	free(RootDirectory);
+	free(FileBuffer);
 	
 	return 0;
 }
@@ -162,12 +175,22 @@ DirectoryEntry* LookupFile(const char* name){
 }
 
 bool ReadFile(FILE* disk, DirectoryEntry* entry, Byte* buffer){
-	int FirstCluster = entry->FirstClusterLow;
-	int LBA = RootDirectoryEnd + ((FirstCluster - 2) * bootsec.SEC_PER_CLUST);
-
+	Word CurrentCluster = entry->FirstClusterLow;
 	bool good = true;
 
-	
+	do{
+		int LBA = RootDirectoryEnd + ((CurrentCluster - 2) * bootsec.SEC_PER_CLUST);
+
+		good = good && ReadSectors(disk, LBA, bootsec.SEC_PER_CLUST, buffer);
+		buffer += bootsec.SEC_PER_CLUST * bootsec.BYTES_PER_SEC;		// Remember, pointers are just address numbers. We advance the address by the number of bytes in a cluster
+
+		int fatIndex = CurrentCluster * 3 / 2;
+		if (CurrentCluster % 2 == 0)
+			CurrentCluster = (*(uint16_t*)(FileAllocationTable + fatIndex)) & 0x0FFF;
+		else
+			CurrentCluster = (*(uint16_t*)(FileAllocationTable + fatIndex)) >> 4;
+
+	} while (good && CurrentCluster < 0x0FF8);
 
 	return good;
 }
