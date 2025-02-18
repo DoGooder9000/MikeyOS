@@ -316,21 +316,128 @@ DiskError:
 
 LoadKernel:
 	; Process of Loading Kernel
-	; 1. Read / Load the File Allocation Table ( FAT )
-	; 2. Read / Load the Root Directory
+	; 1. Read / Load the Root Directory
+	; 2. Read / Load the File Allocation Table ( FAT )
 	; 3. Lookup Kernel.bin in the Root Directory
 	; 4. Read Kernel.bin into a memory location
 	; 5. Jump to the start of Kernel.bin in memory
 
+	; 1. Read the Root Directory
+	call ReadRootDirectory
 
+	; 2. Read FAT
+	call ReadFAT
+	; FAT should be in Buffer now
+
+	; Success
+	mov si, Success
+	call print
+	jmp haltloop
+
+ReadRootDirectory:
+	; Read / Load the Root Directory
+
+	; First, we need to read the Root Directory into memory
+	
+	pusha		; Push all registers to the Stack
+	
+	; RootDirectoryStart = bootsec.NUM_RES_SECT + FATSectorCount
+	; First, calculate the FAT Sector Count
+	; FATSectorCount = bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
+	mov ax, [FAT_ALLOC_TB]
+	mov bx, [SEC_PER_FAT]
+	mul bx
+	; AX should now have the FAT Sector Count
+	; Now add the number of Reserved Sectors
+	mov bx, [NUM_RES_SECT]
+	add ax, bx
+	; AX now has the Root Directory Start value
+
+	; Now we need to read the Root Directory into Memory
+	; We will use the Buffer location
+
+	; First we need to convert LBA into CHS
+	call LBAtoCHS	; Takes the LBA in AX ( already there )
+
+
+	popa		; Pop all the registers off of the Stack
+
+	ret			; Return
+
+ReadFAT:
+	pusha
+
+	; AX - LBA
+	mov ax, [NUM_RES_SECT]	; Set the LBA to the start of the FAT. NUM_RES_SECT is 1
+
+	call LBAtoCHS			; Convert the LBA into CHS
+
+	; Actually read the Sectors
+	; AH 	- 0x02
+	; AL 	- Sectors to Read Count
+	; CH 	- Cylinder
+	; CL 	- Sector
+	; DH 	- Head
+	; DL 	- Drive
+	; ES:BX - Buffer Address Pointer
+
+	mov ah, 0x02
+	
+	; Set the Sectors to Read
+	xor dx, dx
+	mov ax, [FAT_ALLOC_TB]
+	mov bx, [SEC_PER_FAT]
+	mul bx
+	; AX ( or AL because the value is so small ) should have the Sectors to Read
+	; AL should be 18 ( Num of FAT Sectors )
+
+	; CHS has been set already
+
+	; Set the Drive in DL. Really not necessary because the drive is almost always goina be 0 ( for floppies at least )
+	mov dl, [DRIVE_NUM]
+
+	; Set the Buffer Address Pointer
+	push ax
+	mov ax, 0		; We set ES to 0 at the start of the Bootloader, but just in case
+	mov es, ax		; Set ES to 0
+	pop ax
+
+	mov bx, Buffer	; Set BX to the address of the Buffer
+
+	; Call ReadSectorsFromDrive
+	call ReadSectorsFromDrive
+
+	; The FAT Sectors should be loaded into the Buffer now
+
+	popa
+
+	ret
 
 FATKernelFileName: db "KERNEL  BIN"
+
+; FATStart = 1 = bootsec.NUM_RES_SECT
+; FATSectorCount = 18 = bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
+; FATSize = 0x2400 = FATSectorCount * bootsec.BYTES_PER_SEC
+; 
+; EntrySize = 32 Bytes
+; 
+; RootDirectoryStart = 19 = bootsec.NUM_RES_SECT + FATSectorCount
+; RootDirectoryByteLength = 0x1C00 = (bootsec.ROOT_DIR_ENT * EntrySize)
+; RootDirectorySectorLength = 14 = (RootDirectoryByteLength + bootsec.BYTES_PER_SEC - 1) / bootsec.BYTES_PER_SEC // Rounds up to the nearest whole sector
+; RootDirectoryPaddedByteLength = 0x1C00 = RootDirectorySectorLength * bootsec.BYTES_PER_SEC
+; RootDirectoryEnd = 34 = RootDirectoryStart + RootDirectorySectorLength
 
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
 Halted: db "Halted", ENDL, 0
 
+Success: db "Success", ENDL, 0
+
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
 
 dw 0xAA55
+
+Buffer:
+	; The Buffer label has no physical size. It is just a location for the assembler to point to in the code
+	; This means that "Buffer" will not cause the Bootloader to exceed the maximum 512 bytes in the boot sector
