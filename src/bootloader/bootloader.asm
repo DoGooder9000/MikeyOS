@@ -92,26 +92,7 @@ print: ; Put the address of the line in SI
 	ret		; Return
 
 main:
-	mov ax, 1
-
-	call LBAtoCHS
-
-	; mov ch, 0	; Cylinder
-	; mov dh, 0	; Head
-	; mov cl, 2	; Sector
-
-	mov ah, 0x02			; Interrupt funciton 0x02
-	mov al, 63				; Sectors to read ( 1 )
-	mov dl, [DRIVE_NUM]		; The Drive number to read from
-
-	xor bx, bx
-	mov es, bx
-
-	mov bx, 0x7E00	; ( ES:BX ) ( 0 : 0x7E00 )
-
-	call ReadSectorsFromDrive
-
-	jmp 0xBE00
+	jmp LoadKernel
 
 	jmp haltloop
 	
@@ -164,7 +145,6 @@ LBAtoCHS:
 	push CX				; Push CX to the Stack just in case
 
 	; Cylinder is done
-
 	
 	; Head time
 	; Head = ( LBA / SPT ) % HPC
@@ -250,7 +230,6 @@ LBAtoCHS:
 	or cx, di	; OR CX and DI to get the cylinder and sector together
 
 	pop ax		; Pop the previous value of AX from the stack
-
 	
 	ret			; Return
 
@@ -335,7 +314,17 @@ DiskError:
 
 	jmp haltloop
 
-KernelFileName: db "KERNEL  BIN"
+LoadKernel:
+	; Process of Loading Kernel
+	; 1. Read / Load the File Allocation Table ( FAT )
+	; 2. Read / Load the Root Directory
+	; 3. Lookup Kernel.bin in the Root Directory
+	; 4. Read Kernel.bin into a memory location
+	; 5. Jump to the start of Kernel.bin in memory
+
+
+
+FATKernelFileName: db "KERNEL  BIN"
 
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
