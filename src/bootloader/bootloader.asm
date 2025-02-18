@@ -317,21 +317,29 @@ DiskError:
 LoadKernel:
 	; Process of Loading Kernel
 	; 1. Read / Load the Root Directory
-	; 2. Read / Load the File Allocation Table ( FAT )
-	; 3. Lookup Kernel.bin in the Root Directory
+	; 2. Lookup Kernel.bin in the Root Directory
+	; 3. Read / Load the File Allocation Table ( FAT )
 	; 4. Read Kernel.bin into a memory location
 	; 5. Jump to the start of Kernel.bin in memory
 
 	; 1. Read the Root Directory
 	call ReadRootDirectory
 
+	; 2. Lookup Kernel.bin in the Root Directory
+	; We need to compare the "KERNEL  BIN" to the Root Directory
+	call SearchRootDirectory
+	; DS:SI should have the address of "KERNEL  BIN"
+
 	; 2. Read FAT
 	call ReadFAT
 	; FAT should be in Buffer now
 
+
+
 	; Success
 	mov si, Success
 	call print
+
 	jmp haltloop
 
 ReadRootDirectory:
@@ -345,6 +353,7 @@ ReadRootDirectory:
 	; First, calculate the FAT Sector Count
 	; FATSectorCount = bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
 	mov ax, [FAT_ALLOC_TB]
+	xor ah, ah
 	mov bx, [SEC_PER_FAT]
 	mul bx
 	; AX should now have the FAT Sector Count
@@ -359,10 +368,121 @@ ReadRootDirectory:
 	; First we need to convert LBA into CHS
 	call LBAtoCHS	; Takes the LBA in AX ( already there )
 
+	push cx
+	push dx
+	push di
+
+	; We need to calculate the number of sectors to read
+	; RootDirectorySectorLength = (RootDirectoryByteLength + bootsec.BYTES_PER_SEC - 1) / bootsec.BYTES_PER_SEC
+	; RootDirectoryByteLength = (bootsec.ROOT_DIR_ENT * EntrySize)
+	; EntrySize = 32
+	; First calculate the RootDirectoryByteLength
+	mov ax, [ROOT_DIR_ENT]
+	mov bx, [DirectoryEntrySize]
+	xor bh, bh
+	mul bx
+	; RootDirectoryByteLength is in AX
+	; Now calculate the Sector Length
+	add ax, [BYTES_PER_SEC]		; + bootsec.BYTES_PER_SEC
+	dec ax						; - 1
+	div word [BYTES_PER_SEC]	; / bootsec.BYTES_PER_SEC. This is a word the result should end up in DX ( remainder ) AX ( Result )
+	; Result is in AX
+
+	; Read the sectors
+	; AH 	- 0x02
+	; AL 	- Sectors to Read Count
+	; CH 	- Cylinder
+	; CL 	- Sector
+	; DH 	- Head
+	; DL 	- Drive
+	; ES:BX - Buffer Address Pointer
+
+	pop di
+	pop dx
+	pop cx
+
+	mov dl, [DRIVE_NUM]
+	
+	push ax
+	mov ax, 0
+	mov es, ax	; Set ES to 0
+	pop ax
+
+	mov bx, Buffer
+
+	call ReadSectorsFromDrive
+
+	; Root Directory should be in Buffer
 
 	popa		; Pop all the registers off of the Stack
 
 	ret			; Return
+
+SearchRootDirectory:
+	; Byte Name[11]
+	; Byte Attributes
+	; Byte _Reserved
+	; Byte CreatedTimeTenths
+	; Word CreatedTime
+	; Word CreatedDate
+	; Word AccessedDate
+	; Word FirstClusterHigh
+	; Word ModifiedTime
+	; Word ModifiedDate
+	; Word FirstClusterLow
+	; Double Size
+
+	; We need to compare "KERNEL  BIN" to every directory entry until we find it
+	
+	; CMPSB - Compares byte at address DS:(E)SI with byte at address ES:(E)DI
+	; REPE/REPZ - RCX or (E)CX = 0	ZF = 0
+
+	; Set ES and DS to 0 just in case
+	xor ax, ax		; Also sets AX to 0 for the start of the entry count
+	mov ds, ax
+	mov es, ax
+
+	mov si, Buffer	; Start SI at the Buffer address
+
+	jmp .searchrootdirectoryloop
+
+.searchrootdirectoryloop:
+	; DS and ES should both be 0
+
+	; SI is the entry location
+	push si		; Push SI so we can update it later
+	
+	; DI is going to be a pointer to "KERNEL  BIN"
+	mov di, FATKernelFileName
+
+	mov cx, 11		; The name of an entry is 11 bytes, so we need to compare 11 bytes
+
+	repe cmpsb						; Compare the strings
+
+	pop si
+
+	je .searchrootdirectorysuccess	; If they are equal, then jump to success
+
+	cmp ax, [ROOT_DIR_ENT]			; If we are at the end of the Root Directory
+
+	je .searchrootdirectoryfail		; Jump to fail
+
+	add si, [DirectoryEntrySize]	; Go to the start of the next entry
+
+	inc ax
+
+	jmp .searchrootdirectoryloop	; If not equal but still have more entries, jump to the loop start
+
+.searchrootdirectorysuccess:
+	; DS:SI should point to the address of the right entry
+
+	ret		; Return
+
+.searchrootdirectoryfail:
+	mov si, RootDirSearchFailed
+	call print
+
+	jmp haltloop
 
 ReadFAT:
 	pusha
@@ -372,6 +492,10 @@ ReadFAT:
 
 	call LBAtoCHS			; Convert the LBA into CHS
 
+	push cx
+	push dx
+	push di
+
 	; Actually read the Sectors
 	; AH 	- 0x02
 	; AL 	- Sectors to Read Count
@@ -380,27 +504,29 @@ ReadFAT:
 	; DH 	- Head
 	; DL 	- Drive
 	; ES:BX - Buffer Address Pointer
-
-	mov ah, 0x02
 	
 	; Set the Sectors to Read
 	xor dx, dx
 	mov ax, [FAT_ALLOC_TB]
+	xor ah, ah
 	mov bx, [SEC_PER_FAT]
 	mul bx
 	; AX ( or AL because the value is so small ) should have the Sectors to Read
 	; AL should be 18 ( Num of FAT Sectors )
 
+	mov ah, 0x02
+
 	; CHS has been set already
+	pop di
+	pop dx
+	pop cx
 
 	; Set the Drive in DL. Really not necessary because the drive is almost always goina be 0 ( for floppies at least )
 	mov dl, [DRIVE_NUM]
 
 	; Set the Buffer Address Pointer
-	push ax
-	mov ax, 0		; We set ES to 0 at the start of the Bootloader, but just in case
-	mov es, ax		; Set ES to 0
-	pop ax
+	mov bx, 0		; We set ES to 0 at the start of the Bootloader, but just in case
+	mov es, bx		; Set ES to 0
 
 	mov bx, Buffer	; Set BX to the address of the Buffer
 
@@ -430,8 +556,11 @@ FATKernelFileName: db "KERNEL  BIN"
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
 Halted: db "Halted", ENDL, 0
+RootDirSearchFailed: db "No Kernel.bin found", ENDL, 0
 
 Success: db "Success", ENDL, 0
+
+DirectoryEntrySize: db 32
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
