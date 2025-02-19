@@ -297,6 +297,10 @@ LoadKernel:
 	call ReadKernel
 
 	; 5. Jump to the start of Kernel.bin in memory
+	mov ax, KERNEL_SEGMENT
+	mov ds, ax
+	mov es, ax
+
 	jmp KERNEL_SEGMENT:KERNEL_OFFSET
 
 	; should never get here
@@ -492,8 +496,6 @@ ReadKernel:
 	mov es, bx
 	mov bx, KERNEL_OFFSET
 
-	jmp .readkernelloop
-
 .readkernelloop:
 	; This is the loop for reading the Kernel.bin File
 
@@ -543,6 +545,7 @@ ReadKernel:
 	; (FileAllocationTable + fatIndex)
 	mov si, Buffer
 	add si, di		; (FileAllocationTable + fatIndex)
+	mov di, [ds:si] ; Get the actual value on the FAT Table
 	; DI had the FAT index
 
 	; (CurrentCluster % 2 == 0)
@@ -557,19 +560,17 @@ ReadKernel:
 
 .currentclustereven:
 	; CurrentCluster = (*(FileAllocationTable + fatIndex)) & 0x0FFF
-	and si, 0x0FFF	; & 0x0FFF
+	and di, 0x0FFF	; & 0x0FFF
 
-	mov ax, [si]
-	mov [CurrentCluster], ax	; CurrentCluster =
+	mov [CurrentCluster], di	; CurrentCluster =
 	
 	jmp .readkernelloopend
 
 .currentclusterodd:
 	; CurrentCluster = (*(FileAllocationTable + fatIndex)) >> 4
-	shr si, 4	; >> 4
+	shr di, 4	; >> 4
 
-	mov ax, [si]
-	mov [CurrentCluster], ax	; CurrentCluster =
+	mov [CurrentCluster], di	; CurrentCluster =
 
 	jmp .readkernelloopend
 

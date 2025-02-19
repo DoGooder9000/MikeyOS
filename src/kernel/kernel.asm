@@ -1,4 +1,4 @@
-org 0x0000
+org 0x0
 bits 16
 
 %define ENDL 0x0D, 0x0A
@@ -39,4 +39,4 @@ print: ; Put the address of the line in SI
 
 	ret			; Return
 
-msg: db "Kernel Loaded", ENDL, 0
+msg: db "Hello from the Kernel!", ENDL, 0
