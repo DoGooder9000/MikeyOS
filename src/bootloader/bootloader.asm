@@ -93,8 +93,6 @@ print: ; Put the address of the line in SI
 
 main:
 	jmp LoadKernel
-
-	jmp haltloop
 	
 haltloop:
 	hlt
@@ -123,53 +121,37 @@ LBAtoCHS:
 	push bx				; Push BX to the Stack
 	push si				; Push SI to the Stack
 
+
 	mov si, ax			; Put the LBA into SI from AX
 
-	mov ax, [NUM_HEADS]		; Put the HPC into AX
-	mov bx, [SEC_PER_TRCK]	; Put the SPT into BX
+	mov ax, [NUM_HEADS]		; HPC
+	mul word [SEC_PER_TRCK]	; SPT
 
-	mul bx				; Multiply HPC * SPT
+	mov bx, ax	; BX = HPC * SPT
 
-	mov bx, ax			; Move AX into BX
+	mov ax, si
+	xor dx, dx	; Set DX:AX to the LBA
 
-	mov ax, si			; Move the LBA into AX
+	div bx
+	; Result should be in AX
 
-	xor dx, dx			; Set DX to 0
-
-	div bx				; LBA / ( HPC * SPT )
-
-	and ax, 0x00FF			; Keep only the lower 8 bits of AX
-
-	mov cx, ax			; Move the result ( cylinder value ) into cx
-
-	push CX				; Push CX to the Stack just in case
+	push ax		; Push AX to the Stack to get the value later
 
 	; Cylinder is done
 	
 	; Head time
 	; Head = ( LBA / SPT ) % HPC
 
-	mov ax, si			; Move LBA into AX from SI
+	mov ax, si
+	xor dx, dx		; Set DX:AX to LBA
 
-	mov bx, [SEC_PER_TRCK]	; Set BX to SPT
+	div word [SEC_PER_TRCK]	; ( LBA / SPT )
+	; Result should be in AX
+	xor dx, dx		; Set DX:AX to ( LBA / SPT )
 
-	xor dx, dx			; Set DX to 0
-
-	div bx				; Divide AX ( LBA ) by BX ( SPT )
-
-	and ax, 0x00FF			; We only want the bottom 8 bits ( the result )
-
-	mov bx, [NUM_HEADS]	; Set BX to the HeadsPerCylinder
-
-	xor dx, dx			; Set DX to 0
-
-	div bx				; Divide ( or in our case modulus ) AX ( LBA / SPT ) and BX ( HPC )
-
-	mov dh, dl			; Move the Modulus result ( stored in DL ) to DH ( where the Head value is stored )
-
-	xor dl, dl			; Set DL to 0
-
-	push dx				; Push DX to the Stack just in case
+	div word [NUM_HEADS]	; % HPC
+	; Modulus result should be in DX
+	push dx
 
 	; Head is done
 
@@ -330,15 +312,15 @@ LoadKernel:
 	call SearchRootDirectory
 	; DS:SI should have the address of "KERNEL  BIN"
 
-	; 2. Read FAT
+	; 3. Read FAT
 	call ReadFAT
 	; FAT should be in Buffer now
+	
+	; 4. Read Kernel.bin into a memory location
+	call ReadKernel
 
-
-
-	; Success
-	mov si, Success
-	call print
+	; 5. Jump to the start of Kernel.bin in memory
+	jmp KERNEL_SEGMENT:KERNEL_OFFSET
 
 	jmp haltloop
 
@@ -476,6 +458,9 @@ SearchRootDirectory:
 .searchrootdirectorysuccess:
 	; DS:SI should point to the address of the right entry
 
+	mov ax, [si + 26]			; 26 is the offset of the low first cluster of the entry
+	mov [CurrentCluster], ax	; Move the starting cluster number into the Current Cluster
+
 	ret		; Return
 
 .searchrootdirectoryfail:
@@ -539,6 +524,121 @@ ReadFAT:
 
 	ret
 
+ReadKernel:
+	; The FAT is in the Buffer
+	
+	; We need to calculate the RootDirectoryEnd
+	; FATSectorCount
+	mov ax, [FAT_ALLOC_TB]	; bootsec.FAT_ALLOC_TB
+	mov bx, [SEC_PER_FAT]	; bootsec.SEC_PER_FAT
+	mul bx					; bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
+
+	mov bx, [NUM_RES_SECT]		; First Calculate the start of the Root Directory
+	add ax, bx					; bootsec.NUM_RES_SECT + FATSectorCount
+	; Result should be in AX
+
+	mov [RootDirectoryEnd], ax	; Set the RootDirectoryEnd
+
+	; We are going to put the Kernel load location in ES:BX
+	mov bx, KERNEL_SEGMENT
+	mov es, bx
+	mov bx, KERNEL_OFFSET
+
+	jmp .readkernelloop
+
+.readkernelloop:
+	; This is the loop for reading the Kernel.bin File
+
+	; LBA = RootDirectoryEnd + ((CurrentCluster - 2) * bootsec.SEC_PER_CLUST);
+	; Calculate LBA
+	mov ax, [CurrentCluster]
+	sub ax, 2
+	mul byte [SEC_PER_CLUST]
+	add ax, [RootDirectoryEnd]
+	; LBA is in AX
+
+	call LBAtoCHS	; Convert the LBA in CHS
+
+	; Read the Kernel
+	; AH 	- 0x02
+	; AL 	- Sectors to Read Count
+	; CH 	- Cylinder
+	; CL 	- Sector
+	; DH 	- Head
+	; DL 	- Drive
+	; ES:BX - Buffer Address Pointer
+
+	mov ah, 0x02
+	mov al, [SEC_PER_CLUST]
+	mov dl, [DRIVE_NUM]
+
+	call ReadSectorsFromDrive	; Read the Sectors
+
+	; Increment the Kernel Pointer
+	; buffer += bootsec.SEC_PER_CLUST * bootsec.BYTES_PER_SEC
+	mov ax, [SEC_PER_CLUST]	; bootsec.SEC_PER_CLUST
+	mul word [BYTES_PER_SEC]	; bootsec.SEC_PER_CLUST * bootsec.BYTES_PER_SEC
+	add bx, ax	; buffer +=
+
+	push bx	; Push BX to the Stack so we can use it
+
+	; Calculate FAT index
+	mov ax, [CurrentCluster]
+	mov bx, 3
+	mul bx
+	mov bx, 2
+	div bx
+	; Result should be in AX
+	mov bx, ax	; Move the result to BX
+	; BX should have the FAT Index
+
+	; (CurrentCluster % 2 == 0)
+	mov ax, [CurrentCluster]
+	mov bx, 2
+	div bx
+	; Remainder should be in DX
+
+	test dx, dx
+
+	; (FileAllocationTable + fatIndex)
+	mov ax, Buffer
+	add ax, bx		; (FileAllocationTable + fatIndex)
+	; BX had the FAT index
+
+	pop bx	; Pop BX from the Stack
+
+	jz .currentclustereven
+	jmp .currentclusterodd
+
+.currentclustereven:
+	; CurrentCluster = ((FileAllocationTable + fatIndex)) & 0x0FFF
+	and ax, 0x0FFF	; & 0x0FFF
+
+	mov si, ax
+	mov ax, [si]
+	mov [CurrentCluster], ax	; CurrentCluster =
+	
+	jmp .readkernelloopend
+
+.currentclusterodd:
+	; CurrentCluster = ((FileAllocationTable + fatIndex)) >> 4
+	shr ax, 4	; >> 4
+
+	mov si, ax
+	mov ax, [si]
+	mov [CurrentCluster], ax	; CurrentCluster =
+
+	jmp .readkernelloopend
+
+.readkernelloopend:
+	; while (good && CurrentCluster < 0x0FF8);
+
+	cmp word [CurrentCluster], 0x0FF8
+
+	jl .readkernelloop	; If the Current Cluster is less than 0x0FF8, then do the loop again
+	
+	ret		; If its done, return back
+
 FATKernelFileName: db "KERNEL  BIN"
 
 ; FATStart = 1 = bootsec.NUM_RES_SECT
@@ -555,12 +655,17 @@ FATKernelFileName: db "KERNEL  BIN"
 
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
-Halted: db "Halted", ENDL, 0
 RootDirSearchFailed: db "No Kernel.bin found", ENDL, 0
 
 Success: db "Success", ENDL, 0
 
 DirectoryEntrySize: db 32
+RootDirectoryEnd: db 0
+
+CurrentCluster: dw 0
+
+KERNEL_SEGMENT	equ 0x1800
+KERNEL_OFFSET	equ 0
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 				; $ = Current Location ; $$ = Start of program location
