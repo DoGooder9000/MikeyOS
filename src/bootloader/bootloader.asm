@@ -149,7 +149,8 @@ LBAtoCHS:
 	xor dx, dx		; Set DX:AX to ( LBA / SPT )
 
 	div word [NUM_HEADS]	; % HPC
-	; Modulus result should be in DX
+	; Modulus result should be in DX ( DL )
+	mov dh, dl		; Move it to DH
 	push dx
 
 	; Head is done
@@ -162,9 +163,9 @@ LBAtoCHS:
 
 	div word [SEC_PER_TRCK]	; % SPT
 
-	inc ax
+	inc dx
 
-	mov di, ax
+	mov di, dx
 
 	; Sectors are done
 
@@ -298,7 +299,7 @@ LoadKernel:
 	; 5. Jump to the start of Kernel.bin in memory
 	jmp KERNEL_SEGMENT:KERNEL_OFFSET
 
-	jmp haltloop
+	; should never get here
 
 ReadRootDirectory:
 	; Read / Load the Root Directory
@@ -343,6 +344,7 @@ ReadRootDirectory:
 	; Now calculate the Sector Length
 	add ax, [BYTES_PER_SEC]		; + bootsec.BYTES_PER_SEC
 	dec ax						; - 1
+	xor dx, dx
 	div word [BYTES_PER_SEC]	; / bootsec.BYTES_PER_SEC. This is a word the result should end up in DX ( remainder ) AX ( Result )
 	; Result is in AX
 	; AX has the number of sectors to read
@@ -357,6 +359,8 @@ ReadRootDirectory:
 	; DH 	- Head
 	; DL 	- Drive
 	; ES:BX - Buffer Address Pointer
+
+	mov ah, 0x02
 
 	pop dx
 	pop cx
@@ -419,7 +423,8 @@ SearchRootDirectory:
 
 	je .searchrootdirectoryfail		; Jump to fail
 
-	add si, [DirectoryEntrySize]	; Go to the start of the next entry
+	mov cl, [DirectoryEntrySize]	; We can use CX here real quick
+	add si, cx						; Go to the start of the next entry
 
 	inc ax
 
@@ -447,10 +452,6 @@ ReadFAT:
 
 	call LBAtoCHS			; Convert the LBA into CHS
 
-	push cx
-	push dx
-	push di
-
 	; Actually read the Sectors
 	; AH 	- 0x02
 	; AL 	- Sectors to Read Count
@@ -461,26 +462,17 @@ ReadFAT:
 	; ES:BX - Buffer Address Pointer
 	
 	; Set the Sectors to Read
-	xor dx, dx
-	mov ax, [FAT_ALLOC_TB]
-	xor ah, ah
-	mov bx, [SEC_PER_FAT]
-	mul bx
+	mov ax, [SEC_PER_FAT]
+	mul byte [FAT_ALLOC_TB]
 	; AX ( or AL because the value is so small ) should have the Sectors to Read
 	; AL should be 18 ( Num of FAT Sectors )
 
 	mov ah, 0x02
 
-	; CHS has been set already
-	pop di
-	pop dx
-	pop cx
-
 	; Set the Drive in DL. Really not necessary because the drive is almost always goina be 0 ( for floppies at least )
 	mov dl, [DRIVE_NUM]
 
 	; ES is already set to 0
-
 	mov bx, Buffer	; Set BX to the address of the Buffer
 
 	; Call ReadSectorsFromDrive
@@ -510,7 +502,7 @@ ReadKernel:
 	mov ax, [CurrentCluster]
 	sub ax, 2
 	mul byte [SEC_PER_CLUST]
-	add ax, [RootDirectoryEnd]
+	add al, [RootDirectoryEnd]		; AL because RootDirectoryEnd is a byte
 	; LBA is in AX
 
 	call LBAtoCHS	; Convert the LBA in CHS
@@ -532,55 +524,50 @@ ReadKernel:
 
 	; Increment the Kernel Pointer
 	; buffer += bootsec.SEC_PER_CLUST * bootsec.BYTES_PER_SEC
-	mov ax, [SEC_PER_CLUST]	; bootsec.SEC_PER_CLUST
+	mov al, [SEC_PER_CLUST]	; bootsec.SEC_PER_CLUST. AL because SEC_PER_CLUST is a byte
 	mul word [BYTES_PER_SEC]	; bootsec.SEC_PER_CLUST * bootsec.BYTES_PER_SEC
 	add bx, ax	; buffer +=
-
-	push bx	; Push BX to the Stack so we can use it
+	; NOTE! THE ABOVE OPERATION COULD OVERFLOW IF KERNEL.BIN IS OVER 64 KB
 
 	; Calculate FAT index
+	; fatIndex = CurrentCluster * 3 / 2;
 	mov ax, [CurrentCluster]
-	mov bx, 3
-	mul bx
-	mov bx, 2
-	div bx
+	mov cx, 3
+	mul cx
+	mov cx, 2
+	div cx
 	; Result should be in AX
-	mov bx, ax	; Move the result to BX
-	; BX should have the FAT Index
+	mov di, ax	; Move the result to DI ( temporarily )
+	; DI should have the FAT Index
+
+	; (FileAllocationTable + fatIndex)
+	mov si, Buffer
+	add si, di		; (FileAllocationTable + fatIndex)
+	; DI had the FAT index
 
 	; (CurrentCluster % 2 == 0)
 	mov ax, [CurrentCluster]
-	mov bx, 2
-	div bx
+	div cx	; CX should still be 2
 	; Remainder should be in DX
 
 	test dx, dx
-
-	; (FileAllocationTable + fatIndex)
-	mov ax, Buffer
-	add ax, bx		; (FileAllocationTable + fatIndex)
-	; BX had the FAT index
-
-	pop bx	; Pop BX from the Stack
 
 	jz .currentclustereven
 	jmp .currentclusterodd
 
 .currentclustereven:
-	; CurrentCluster = ((FileAllocationTable + fatIndex)) & 0x0FFF
-	and ax, 0x0FFF	; & 0x0FFF
+	; CurrentCluster = (*(FileAllocationTable + fatIndex)) & 0x0FFF
+	and si, 0x0FFF	; & 0x0FFF
 
-	mov si, ax
 	mov ax, [si]
 	mov [CurrentCluster], ax	; CurrentCluster =
 	
 	jmp .readkernelloopend
 
 .currentclusterodd:
-	; CurrentCluster = ((FileAllocationTable + fatIndex)) >> 4
-	shr ax, 4	; >> 4
+	; CurrentCluster = (*(FileAllocationTable + fatIndex)) >> 4
+	shr si, 4	; >> 4
 
-	mov si, ax
 	mov ax, [si]
 	mov [CurrentCluster], ax	; CurrentCluster =
 
@@ -610,8 +597,8 @@ FATKernelFileName: db "KERNEL  BIN"
 ; RootDirectoryEnd = 34 = RootDirectoryStart + RootDirectorySectorLength
 
 ; Error Messages
-DiskErrorMessage: db "Disk Error", ENDL, 0
-RootDirSearchFailed: db "No Kernel.bin found", ENDL, 0
+DiskErrorMessage: db "DError", ENDL, 0
+RootDirSearchFailed: db "RDSF", ENDL, 0
 
 DirectoryEntrySize: db 32
 RootDirectoryEnd: db 0
