@@ -121,7 +121,6 @@ LBAtoCHS:
 	push bx				; Push BX to the Stack
 	push si				; Push SI to the Stack
 
-
 	mov si, ax			; Put the LBA into SI from AX
 
 	mov ax, [NUM_HEADS]		; HPC
@@ -154,32 +153,23 @@ LBAtoCHS:
 	push dx
 
 	; Head is done
-
 	
 	; Sector time
 	; Sector = ( LBA % SPT ) + 1
 
-	mov ax, si			; Move LBA from SI into AX
+	mov ax, si
+	xor dx, dx		; Set DX:AX to LBA
 
-	mov bx, [SEC_PER_TRCK]	; Move SPT into BX
+	div word [SEC_PER_TRCK]	; % SPT
 
-	xor dx, dx			; Set DX to 0
+	inc ax
 
-	div bx				; Divide ( modulus ) AX ( LBA ) by BX ( SPT )
-
-	mov ax, dx			; Modulus result is stored in DX, so move it to AX
-
-	mov di, ax			; Move the reminder into DI
-
-	inc di				; Add one to DI
-
-	push di				; Push DI to the Stack just in case
+	mov di, ax
 
 	; Sectors are done
 
 	; Cleanup time
 
-	pop di				; Pop DI
 	pop dx				; Pop DX
 	pop cx				; Pop CX
 
@@ -192,8 +182,6 @@ LBAtoCHS:
 
 	; PUT CYLINDER IN 	CX
 	; PUT SECTOR IN 	DI
-
-	push ax		; Push AX onto the Stack so we can use it as an intermediary
 
 	mov ax, cx	; Copy the Cylinder Value into AX from CX
 
@@ -210,8 +198,6 @@ LBAtoCHS:
 	or cx, ax	; OR CX and AX
 	
 	or cx, di	; OR CX and DI to get the cylinder and sector together
-
-	pop ax		; Pop the previous value of AX from the stack
 	
 	ret			; Return
 
@@ -222,9 +208,6 @@ ResetDiskSystem:
 	; AH - 0x00
 	; DL - Drive ( probably 0x00 )
 
-	push ax		; Push AX to the Stack
-	push dx		; Push DX to the Stack
-
 	clc		; Clear the carry flag
 
 	mov ah, 0x00	; Set AH to 0x00
@@ -233,9 +216,6 @@ ResetDiskSystem:
 	int 0x13	; Trigger interrupt 0x13
 
 	jc DiskError	; Jump if the carry flag was set ( if something went wrong )
-
-	pop dx		; Pop DX
-	pop ax		; Pop AX
 
 	ret		; Return
 
@@ -277,14 +257,10 @@ GetStatusOfLastDriveOperation:
 	; We will return the value of this function in AH
 	; AH will hold the return code
 
-	push dx		; Push DX to the Stack
-
 	mov ah, 0x01	; Set AH to 0x01
 	mov dl, 0x00	; Set DL to 0x00
 
 	int 0x13	; Trigger interrupt 0x13
-
-	pop dx		; Pop DX
 	
 	ret		; Return
 
@@ -329,20 +305,21 @@ ReadRootDirectory:
 
 	; First, we need to read the Root Directory into memory
 	
-	pusha		; Push all registers to the Stack
+	pusha	; Push all registers to the Stack
 	
 	; RootDirectoryStart = bootsec.NUM_RES_SECT + FATSectorCount
 	; First, calculate the FAT Sector Count
 	; FATSectorCount = bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
 	mov ax, [FAT_ALLOC_TB]
 	xor ah, ah
-	mov bx, [SEC_PER_FAT]
-	mul bx
+	mul word [SEC_PER_FAT]
+
 	; AX should now have the FAT Sector Count
 	; Now add the number of Reserved Sectors
-	mov bx, [NUM_RES_SECT]
-	add ax, bx
+	add ax, [NUM_RES_SECT]
 	; AX now has the Root Directory Start value
+
+	mov [RootDirectoryEnd], ax		; Make the calculations shorter for ReadKernel
 
 	; Now we need to read the Root Directory into Memory
 	; We will use the Buffer location
@@ -352,23 +329,25 @@ ReadRootDirectory:
 
 	push cx
 	push dx
-	push di
 
 	; We need to calculate the number of sectors to read
 	; RootDirectorySectorLength = (RootDirectoryByteLength + bootsec.BYTES_PER_SEC - 1) / bootsec.BYTES_PER_SEC
 	; RootDirectoryByteLength = (bootsec.ROOT_DIR_ENT * EntrySize)
 	; EntrySize = 32
+
 	; First calculate the RootDirectoryByteLength
 	mov ax, [ROOT_DIR_ENT]
-	mov bx, [DirectoryEntrySize]
-	xor bh, bh
-	mul bx
+	mul byte [DirectoryEntrySize]	; (bootsec.ROOT_DIR_ENT * EntrySize)
 	; RootDirectoryByteLength is in AX
+
 	; Now calculate the Sector Length
 	add ax, [BYTES_PER_SEC]		; + bootsec.BYTES_PER_SEC
 	dec ax						; - 1
 	div word [BYTES_PER_SEC]	; / bootsec.BYTES_PER_SEC. This is a word the result should end up in DX ( remainder ) AX ( Result )
 	; Result is in AX
+	; AX has the number of sectors to read
+
+	add [RootDirectoryEnd], ax		; Make the calculations shorter for ReadKernel	
 
 	; Read the sectors
 	; AH 	- 0x02
@@ -379,16 +358,10 @@ ReadRootDirectory:
 	; DL 	- Drive
 	; ES:BX - Buffer Address Pointer
 
-	pop di
 	pop dx
 	pop cx
 
 	mov dl, [DRIVE_NUM]
-	
-	push ax
-	mov ax, 0
-	mov es, ax	; Set ES to 0
-	pop ax
 
 	mov bx, Buffer
 
@@ -419,10 +392,7 @@ SearchRootDirectory:
 	; CMPSB - Compares byte at address DS:(E)SI with byte at address ES:(E)DI
 	; REPE/REPZ - RCX or (E)CX = 0	ZF = 0
 
-	; Set ES and DS to 0 just in case
 	xor ax, ax		; Also sets AX to 0 for the start of the entry count
-	mov ds, ax
-	mov es, ax
 
 	mov si, Buffer	; Start SI at the Buffer address
 
@@ -509,9 +479,7 @@ ReadFAT:
 	; Set the Drive in DL. Really not necessary because the drive is almost always goina be 0 ( for floppies at least )
 	mov dl, [DRIVE_NUM]
 
-	; Set the Buffer Address Pointer
-	mov bx, 0		; We set ES to 0 at the start of the Bootloader, but just in case
-	mov es, bx		; Set ES to 0
+	; ES is already set to 0
 
 	mov bx, Buffer	; Set BX to the address of the Buffer
 
@@ -526,18 +494,6 @@ ReadFAT:
 
 ReadKernel:
 	; The FAT is in the Buffer
-	
-	; We need to calculate the RootDirectoryEnd
-	; FATSectorCount
-	mov ax, [FAT_ALLOC_TB]	; bootsec.FAT_ALLOC_TB
-	mov bx, [SEC_PER_FAT]	; bootsec.SEC_PER_FAT
-	mul bx					; bootsec.FAT_ALLOC_TB * bootsec.SEC_PER_FAT
-
-	mov bx, [NUM_RES_SECT]		; First Calculate the start of the Root Directory
-	add ax, bx					; bootsec.NUM_RES_SECT + FATSectorCount
-	; Result should be in AX
-
-	mov [RootDirectoryEnd], ax	; Set the RootDirectoryEnd
 
 	; We are going to put the Kernel load location in ES:BX
 	mov bx, KERNEL_SEGMENT
@@ -656,8 +612,6 @@ FATKernelFileName: db "KERNEL  BIN"
 ; Error Messages
 DiskErrorMessage: db "Disk Error", ENDL, 0
 RootDirSearchFailed: db "No Kernel.bin found", ENDL, 0
-
-Success: db "Success", ENDL, 0
 
 DirectoryEntrySize: db 32
 RootDirectoryEnd: db 0
