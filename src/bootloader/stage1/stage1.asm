@@ -44,7 +44,7 @@ start:
 	mov sp, 0x7C00
 
 	push es
-	push word LoadKernel	
+	push word LoadStage2
 	retf
 	
 haltloop:
@@ -119,16 +119,16 @@ ReadSectorsFromDrive:
 DiskError:
 	jmp haltloop
 
-LoadKernel:
+LoadStage2:
 	call ReadRootDirectory
 	call SearchRootDirectory
 	call ReadFAT
-	call ReadKernel
-	mov ax, KERNEL_SEGMENT
+	call ReadStage2
+	mov ax, STAGE2_SEGMENT
 	mov ds, ax
 	mov es, ax
 
-	jmp KERNEL_SEGMENT:KERNEL_OFFSET
+	jmp STAGE2_SEGMENT:STAGE2_OFFSET
 
 ReadRootDirectory:
 	pusha	; Push all registers to the Stack
@@ -154,7 +154,7 @@ ReadRootDirectory:
 	xor dx, dx
 	div word [BYTES_PER_SEC]	; / bootsec.BYTES_PER_SEC. This is a word the result should end up in DX ( remainder ) AX ( Result )
 
-	add [RootDirectoryEnd], ax		; Make the calculations shorter for ReadKernel	
+	add [RootDirectoryEnd], ax
 
 	mov ah, 0x02
 
@@ -179,7 +179,7 @@ SearchRootDirectory:
 .searchrootdirectoryloop:
 	push si		; Push SI so we can update it later
 
-	mov di, FATKernelFileName
+	mov di, Stage2FileName
 
 	mov cx, 11		; The name of an entry is 11 bytes, so we need to compare 11 bytes
 
@@ -229,12 +229,12 @@ ReadFAT:
 
 	ret
 
-ReadKernel:
-	mov bx, KERNEL_SEGMENT
+ReadStage2:
+	mov bx, STAGE2_SEGMENT
 	mov es, bx
-	mov bx, KERNEL_OFFSET
+	mov bx, STAGE2_OFFSET
 
-.readkernelloop:
+.readstage2loop:
 	mov ax, [CurrentCluster]
 	sub ax, 2
 	mul byte [SEC_PER_CLUST]
@@ -277,31 +277,32 @@ ReadKernel:
 
 	mov [CurrentCluster], di	; CurrentCluster =
 	
-	jmp .readkernelloopend
+	jmp .readstage2loopend
 
 .currentclusterodd:
 	shr di, 4	; >> 4
 
 	mov [CurrentCluster], di	; CurrentCluster =
 
-	jmp .readkernelloopend
+	jmp .readstage2loopend
 
-.readkernelloopend:
+.readstage2loopend:
 	cmp word [CurrentCluster], 0x0FF8
 
-	jl .readkernelloop	; If the Current Cluster is less than 0x0FF8, then do the loop again
+	jl .readstage2loop	; If the Current Cluster is less than 0x0FF8, then do the loop again
 	
 	ret		; If its done, return back
 
-FATKernelFileName: db "KERNEL  BIN"
+
+Stage2FileName: db "STAGE2  BIN"
 
 DirectoryEntrySize: db 32
 RootDirectoryEnd: db 0
 
 CurrentCluster: dw 0
 
-KERNEL_SEGMENT	equ 0x1800
-KERNEL_OFFSET	equ 0
+STAGE2_SEGMENT	equ 0x1800
+STAGE2_OFFSET	equ 0
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 
