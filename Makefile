@@ -5,32 +5,53 @@ BOOT_DIR = $(SRC_DIR)/bootloader
 KERN_DIR = $(SRC_DIR)/kernel
 BUILD_DIR = build
 
+STAGE1_DIR = $(BOOT_DIR)/stage1
+STAGE2_DIR = $(BOOT_DIR)/stage2
+
 TOOLS = tools
 FAT-TOOLS = $(TOOLS)/fat
 
 FAT-TOOLS-FILES = $(wildcard $(FAT-TOOLS)/*.c)
 
-.PHONY: floppy bootloader kernel clean nogui gui wsl tools
+.PHONY: floppy stage1 stage2 kernel clean nogui gui wsl tools
 
-$(BUILD_DIR)/floppy.img: $(BUILD_DIR)/bootloader.bin $(BUILD_DIR)/kernel.bin
-	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880				# Fills a file with 1.44 MB of zeros
+$(BUILD_DIR)/floppy.img: $(BUILD_DIR)/stage1.bin $(BUILD_DIR)/stage2.bin $(BUILD_DIR)/kernel.bin
+	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880
 
-	mkfs.fat -F 12 -n "MIKEYOS" $(BUILD_DIR)/floppy.img							# Formats the file to Fat 12
+	mkfs.fat -F 12 -n "MIKEYOS" $(BUILD_DIR)/floppy.img
 
-	dd if=$(BUILD_DIR)/bootloader.bin of=$(BUILD_DIR)/floppy.img conv=notrunc	# Moves the bootloader.bin into the start of the file
+	dd if=$(BUILD_DIR)/stage1.bin of=$(BUILD_DIR)/floppy.img conv=notrunc
 
-	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/kernel.bin "::kernel.bin"		# Copies the kernel.bin into the right place in the file
+	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/stage2.bin "::stage2.bin"
 
-$(BUILD_DIR)/bootloader.bin: $(BOOT_DIR)/bootloader.asm
-	# Compiles the Bootloader.asm into bootloader.bin
+	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/kernel.bin "::kernel.bin"
 
-	$(ASM) -f bin -o $(BUILD_DIR)/bootloader.bin $(BOOT_DIR)/bootloader.asm
+
+$(BUILD_DIR)/stage1.bin: $(STAGE1_DIR)/stage1.asm
+	# Compiles the stage1.asm into stage1.bin
+
+	make --directory $(STAGE1_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
+
+$(BUILD_DIR)/stage2.bin: $(STAGE2_DIR)/stage2.asm
+	# Compiles the stage2.asm into stage2.bin
+
+	make --directory $(STAGE2_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
 
 
 $(BUILD_DIR)/kernel.bin: $(KERN_DIR)/kernel.asm
 	# Compiles the kernel.asm into kernel.bin
 
-	$(ASM) -f bin -o $(BUILD_DIR)/kernel.bin $(KERN_DIR)/kernel.asm
+	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
+
+
+floppy: $(BUILD_DIR)/floppy.img
+
+stage1: $(STAGE1_DIR)/stage1.bin
+
+stage2: $(STAGE2_DIR)/stage2.bin
+
+kernel: $(BUILD_DIR)/kernel.bin
+
 
 $(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
 	gcc -o $@ $(patsubst %.exe, %.c, $@)
@@ -38,15 +59,10 @@ $(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
 $(patsubst %.c, %.o, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
 	gcc -o $@ $(patsubst %.o, %.c, $@)
 
-floppy: $(BUILD_DIR)/floppy.img
-
-bootloader: $(BUILD_DIR)/bootloader.bin
-
-kernel: $(BUILD_DIR)/kernel.bin
-
 tools: fat-tools
 
 fat-tools: $(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)) $(patsubst %.c, %.o, $(FAT-TOOLS-FILES))
+
 
 clean:
 	rm -f $(BUILD_DIR)/floppy.img

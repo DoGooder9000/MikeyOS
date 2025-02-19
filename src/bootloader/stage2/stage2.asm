@@ -39,4 +39,4 @@ print: ; Put the address of the line in SI
 
 	ret			; Return
 
-msg: db "Hello from the Kernel!", ENDL, 0
+msg: db "Hello from Stage 2!", ENDL, 0
