@@ -39,17 +39,13 @@ start:
 
 	mov ds, ax
 	mov es, ax
-
 	mov ss, ax
 
 	mov sp, 0x7C00
 
 	push es
-	push word main
+	push word LoadKernel	
 	retf
-
-main:
-	jmp LoadKernel
 	
 haltloop:
 	hlt
@@ -61,36 +57,26 @@ LBAtoCHS:
 	push si				; Push SI to the Stack
 
 	mov si, ax			; Put the LBA into SI from AX
-
 	mov ax, [NUM_HEADS]		; HPC
 	mul word [SEC_PER_TRCK]	; SPT
-
 	mov bx, ax	; BX = HPC * SPT
-
 	mov ax, si
 	xor dx, dx	; Set DX:AX to the LBA
-
 	div bx
-
 	push ax		; Push AX to the Stack to get the value later
 
 	mov ax, si
 	xor dx, dx		; Set DX:AX to LBA
-
 	div word [SEC_PER_TRCK]	; ( LBA / SPT )
 	xor dx, dx		; Set DX:AX to ( LBA / SPT )
-
 	div word [NUM_HEADS]	; % HPC
 	mov dh, dl		; Move it to DH
 	push dx
 
 	mov ax, si
 	xor dx, dx		; Set DX:AX to LBA
-
 	div word [SEC_PER_TRCK]	; % SPT
-
 	inc dx
-
 	mov di, dx
 
 	pop dx				; Pop DX
@@ -100,15 +86,11 @@ LBAtoCHS:
 	pop bx				; Pop BX off the Stack
 
 	mov ax, cx	; Copy the Cylinder Value into AX from CX
-
 	and cx, 0xFF	; AND CX with 255 ( This gets the low 8 bits )
 	shl cx, 8	; Shift CX left by 8, into CH
-
 	and ax, 0x300	; AND AX with 768 ( 0b 0000001100000000 ) ( This gets the high 2 bits )
 	shr ax, 2	; Shift AX right by 2
-
 	or cx, ax	; OR CX and AX
-	
 	or cx, di	; OR CX and DI to get the cylinder and sector together
 	
 	ret			; Return
@@ -132,14 +114,6 @@ ReadSectorsFromDrive:
 
 	jc DiskError	; If the carry flag was set ( There was an Error ), jump to DiskError
 
-	ret		; Return
-
-GetStatusOfLastDriveOperation:
-	mov ah, 0x01	; Set AH to 0x01
-	mov dl, 0x00	; Set DL to 0x00
-
-	int 0x13	; Trigger interrupt 0x13
-	
 	ret		; Return
 
 DiskError:
@@ -201,8 +175,6 @@ SearchRootDirectory:
 	xor ax, ax		; Also sets AX to 0 for the start of the entry count
 
 	mov si, Buffer	; Start SI at the Buffer address
-
-	jmp .searchrootdirectoryloop
 
 .searchrootdirectoryloop:
 	push si		; Push SI so we can update it later
@@ -332,7 +304,6 @@ KERNEL_SEGMENT	equ 0x1800
 KERNEL_OFFSET	equ 0
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
-				; $ = Current Location ; $$ = Start of program location
 
 dw 0xAA55
 
