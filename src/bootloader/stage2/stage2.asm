@@ -44,3 +44,10 @@ print: ; Put the address of the line in SI
 	ret			; Return
 
 KernelLoadedMsg: db "Kernel Loaded", ENDL, 0
+
+GDT:
+    ; Entries are 8 bytes long
+    ; First entry is always null
+GDT_NULL:
+    dq 0    ; The first entry is null
+            ; Define a quad word ( 8 bytes )
