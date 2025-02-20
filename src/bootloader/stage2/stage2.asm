@@ -1,4 +1,4 @@
-org 0x0000
+org 0x00
 bits 16
 
 %define ENDL 0x0D, 0x0A
@@ -7,8 +7,12 @@ start:
 	jmp main
 
 main:
-	mov si, msg
-	call print
+    mov si, KernelLoadedMsg
+    call print
+
+	; Our first objective is to switch into 32-bit protected mode
+    ; 1. Turn off interrupts ( and NMI's too )
+    cli
 
 	jmp haltloop
 
@@ -39,4 +43,4 @@ print: ; Put the address of the line in SI
 
 	ret			; Return
 
-msg: db "Hello from Stage 2!", ENDL, 0
+KernelLoadedMsg: db "Kernel Loaded", ENDL, 0
