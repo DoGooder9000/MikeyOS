@@ -1,8 +1,8 @@
-org 0x0000
+org 0x500
 bits 16
 
 %define ENDL 0x0D, 0x0A
-%define STAGE2_BASE 0x18000
+%define STAGE2_BASE 0x0000
 
 start:
 	mov si, Stage2Loaded
@@ -148,5 +148,22 @@ GDT_DESC:
 
 bits 32
 AfterProtectedModeJump:
-	cli
+	; We can't turn on interrupts until we have an IDT
+
+	; We need to set all the segment registers to their proper values
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+
+	; The stack pointer is probably fine where it is
+
+	; We need to load the Kernel now
+	; Get FAT working. No more interrupts until an IDT
+	
+
 	hlt
+
+KERNEL_ADDRESS	equ 0x18000		; The Kernel will be loaded at address 0x18000

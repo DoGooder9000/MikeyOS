@@ -303,8 +303,8 @@ RootDirectoryEnd: db 0
 
 CurrentCluster: dw 0
 
-STAGE2_SEGMENT	equ 0x1800
-STAGE2_OFFSET	equ 0
+STAGE2_SEGMENT	equ 0x0000
+STAGE2_OFFSET	equ 0x0500
 
 times 510-($-$$) db 0x00	; Run ( db 0x00 ) 510-($-$$) times
 
