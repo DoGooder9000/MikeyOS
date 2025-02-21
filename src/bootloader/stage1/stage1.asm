@@ -127,6 +127,8 @@ LoadStage2:
 	mov ax, STAGE2_SEGMENT
 	mov ds, ax
 	mov es, ax
+	mov fs, ax
+	mov gs, ax
 
 	jmp STAGE2_SEGMENT:STAGE2_OFFSET
 
