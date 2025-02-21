@@ -161,8 +161,8 @@ AfterProtectedModeJump:
 	; The stack pointer is probably fine where it is
 
 	; We need to load the Kernel now
-	; Get FAT working. No more interrupts until an IDT
-	
+	; Get FAT working? No more interrupts until an IDT
+	jmp 0x8:KERNEL_ADDRESS
 
 	hlt
 
