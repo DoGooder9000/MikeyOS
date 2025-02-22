@@ -4,6 +4,9 @@ bits 16
 %define ENDL 0x0D, 0x0A
 %define STAGE2_BASE 0x0000
 
+start:
+	jmp main
+
 OEM_IDEN:	db "MSWIN4.1"
 BYTES_PER_SEC:	dw 512
 SEC_PER_CLUST:	db 1
@@ -33,14 +36,26 @@ DirectoryEntrySize: db 32
 
 KernelFileName: db "KERNEL  BIN"
 
-start:
+Stage2Loaded: db "Bootloader Stage 2 is loaded", ENDL, 0
+KernelLoaded: db "Kernel loaded into memory", ENDL, 0
+
+; Error Messages
+DiskErrorMsg: db "Disk Error", ENDL, 0
+
+main:
 	mov si, Stage2Loaded
 	call print
 
 	call LoadKernel
+	mov si, KernelLoaded
+	call print
 
 	; Our first objective is to switch into 32-bit protected mode
 	jmp ProtectedModeEntry
+
+haltloop:
+	hlt
+	jmp haltloop
 
 LoadKernel:
 	call ReadRootDirectory
@@ -103,8 +118,10 @@ ReadSectorsFromDrive:
 	ret		; Return
 
 DiskError:
-	cli
-	hlt
+	mov si, DiskErrorMsg
+	call print
+	
+	jmp haltloop
 
 ReadRootDirectory:
 	pusha	; Push all registers to the Stack
@@ -184,8 +201,7 @@ SearchRootDirectory:
 	ret		; Return
 
 .searchrootdirectoryfail:
-	cli	
-	hlt
+	jmp haltloop
 
 ReadFAT:
 	pusha
@@ -311,8 +327,6 @@ print: ; Put the address of the line in SI
 
 	ret			; Return
 
-Stage2Loaded: db "Bootloader Stage 2 is loaded", ENDL, 0
-
 EnableA20:
 	in al, 0x92
 	or al, 0b00000010
@@ -425,7 +439,7 @@ AfterProtectedModeJump:
 	; Get FAT working? No more interrupts until an IDT
 	jmp 0x8:KERNEL_ADDRESS
 
-	hlt	; Shouldn't get here if Kernel Jump is Successful
+	jmp haltloop	; Shouldn't get here if Kernel Jump is Successful
 
 KERNEL_ADDRESS	equ 0x18000		; The Kernel will be loaded at address 0x18000
 KERNEL_SEGMENT	equ 0x1800
