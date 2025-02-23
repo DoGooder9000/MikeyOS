@@ -4,6 +4,7 @@ SECTIONS {
     . = 0x18000;
     
     .text ALIGN(4K) : {
+        *(.text._start)
         *(.text)
     }
 

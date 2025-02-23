@@ -15,7 +15,7 @@ FAT-TOOLS-FILES = $(wildcard $(FAT-TOOLS)/*.c)
 
 .PHONY: floppy stage1 stage2 kernel clean nogui gui wsl tools
 
-$(BUILD_DIR)/floppy.img: $(BUILD_DIR)/stage1.bin $(BUILD_DIR)/stage2.bin $(BUILD_DIR)/kernel.bin
+$(BUILD_DIR)/floppy.img: stage1 stage2 kernel
 	dd if=/dev/zero of=$(BUILD_DIR)/floppy.img bs=512 count=2880
 
 	mkfs.fat -F 12 -n "MIKEYOS" $(BUILD_DIR)/floppy.img
@@ -24,7 +24,7 @@ $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/stage1.bin $(BUILD_DIR)/stage2.bin $(BUILD
 
 	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/stage2.bin "::stage2.bin"
 
-	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/cKernel.bin "::kernel.bin"
+	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/Kernel.bin "::Kernel.bin"
 
 
 $(BUILD_DIR)/stage1.bin: $(STAGE1_DIR)/stage1.asm
@@ -38,22 +38,20 @@ $(BUILD_DIR)/stage2.bin: $(STAGE2_DIR)/stage2.asm
 	make --directory $(STAGE2_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
 
 
-$(BUILD_DIR)/kernel.bin: $(KERN_DIR)/kernel.asm
+$(BUILD_DIR)/Kernel.bin: $(KERN_DIR)/kernel.asm
 	# Compiles the kernel.asm into kernel.bin
 
 	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
-	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR)) cKernel
-	rm -f $(BUILD_DIR)/cKernel.elf
-	rm -f $(BUILD_DIR)/cKernel.o
+	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR)) Kernel
 
 
 floppy: $(BUILD_DIR)/floppy.img
 
-stage1: $(STAGE1_DIR)/stage1.bin
+stage1: $(BUILD_DIR)/stage1.bin
 
-stage2: $(STAGE2_DIR)/stage2.bin
+stage2: $(BUILD_DIR)/stage2.bin
 
-kernel: $(BUILD_DIR)/kernel.bin
+kernel: $(BUILD_DIR)/Kernel.bin
 
 
 $(patsubst %.c, %.exe, $(FAT-TOOLS-FILES)): $(FAT-TOOLS-FILES)
@@ -72,6 +70,8 @@ clean:
 	rm -f $(BUILD_DIR)/*.bin
 	rm -f $(FAT-TOOLS)/*.o
 	rm -f $(FAT-TOOLS)/*.exe
+
+	make --directory $(KERN_DIR) clean
 
 nogui:
 	qemu-system-i386 -nographic -fda $(BUILD_DIR)/floppy.img
