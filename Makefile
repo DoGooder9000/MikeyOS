@@ -24,7 +24,7 @@ $(BUILD_DIR)/floppy.img: $(BUILD_DIR)/stage1.bin $(BUILD_DIR)/stage2.bin $(BUILD
 
 	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/stage2.bin "::stage2.bin"
 
-	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/kernel.bin "::kernel.bin"
+	mcopy -i $(BUILD_DIR)/floppy.img $(BUILD_DIR)/cKernel.bin "::kernel.bin"
 
 
 $(BUILD_DIR)/stage1.bin: $(STAGE1_DIR)/stage1.asm
@@ -42,6 +42,9 @@ $(BUILD_DIR)/kernel.bin: $(KERN_DIR)/kernel.asm
 	# Compiles the kernel.asm into kernel.bin
 
 	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR))
+	make --directory $(KERN_DIR) BUILD_DIR=$(abspath $(BUILD_DIR)) cKernel
+	rm -f $(BUILD_DIR)/cKernel.elf
+	rm -f $(BUILD_DIR)/cKernel.o
 
 
 floppy: $(BUILD_DIR)/floppy.img
