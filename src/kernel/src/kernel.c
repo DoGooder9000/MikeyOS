@@ -2,11 +2,10 @@
 
 void KernelMain();
 
-char* msg = "C Kernel Loaded";
-int msg_len = 15;
+const char* msg = "C Kernel Loaded";
+int msg_len = 16;
 
 __attribute__((section(".text._start"))) void _start(){
-	// Call the kernel main function
 	KernelMain();
 
 	while(1){
@@ -18,7 +17,7 @@ void KernelMain(){
 	cli();
 
 	ClearScreen();
-	Print(msg, msg_len, GreyOnBlack);
+	Print(msg, strlen(msg), GreyOnBlack, 0);
 
 	halt();
 }

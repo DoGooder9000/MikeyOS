@@ -21,6 +21,10 @@ void cli();
 void halt();
 
 void ClearScreen();
-void Print(char* msg, int msg_len, uint8 color);
+void Print(char* msg, int msg_len, uint8 color, int char_offset);
+int StartOfLine(int char_offset);
+int NewLine(int char_offset);
+
+int strlen(const char* str);
 
 #endif
