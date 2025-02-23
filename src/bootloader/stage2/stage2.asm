@@ -7,28 +7,18 @@ bits 16
 start:
 	jmp main
 
-OEM_IDEN:	db "MSWIN4.1"
 BYTES_PER_SEC:	dw 512
 SEC_PER_CLUST:	db 1
 NUM_RES_SECT:	dw 1
 FAT_ALLOC_TB:	db 2
 ROOT_DIR_ENT:	dw 0xE0
-NUM_SECTORS:	dw 2880
-MED_DES_TYPE:	db 0xF0
 SEC_PER_FAT:	dw 9
 SEC_PER_TRCK:	dw 18
 NUM_HEADS:	dw 2
-HIDDEN_SEC:	dd 0
-LARGE_SEC:	dd 0
 
 ; EXTENDED BOOT RECORD
 
 DRIVE_NUM:	db 0
-WINDOWS_FLAG:	db 0
-DRIVE_SIG:	db 0x29
-VOLUME_ID:	db 0x01, 0x23, 0x45, 0x67
-VOLUME_LABEL:	db "MIKEYOS    "
-SYS_IDEN_STR:	db "FAT12   "
 
 RootDirectoryEnd: db 0
 CurrentCluster: dw 0
