@@ -1,6 +1,7 @@
 #include "headers/kernel.h"
 #include "headers/video.h"
 #include "headers/idt.h"
+#include "headers/string.h"
 
 void KernelMain();
 
@@ -18,10 +19,10 @@ void KernelMain(){
 	cli();
 
 	ClearScreen();
-	CursorPos = Print((char*)"C Kernel Loaded\n", GreyOnBlack, CursorPos);
+	CursorPos = Print((char*)"C Kernel is Loaded\n", GreyOnBlack, CursorPos);
 
 	LoadIDT();
-	CursorPos = Print((char*)"Loaded IDT\n", GreyOnBlack, CursorPos);
+	CursorPos = Print((char*)"IDT is loaded", GreyOnBlack, CursorPos);
 
 	halt();
 }

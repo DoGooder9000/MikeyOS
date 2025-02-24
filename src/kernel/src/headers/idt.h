@@ -11,12 +11,12 @@ typedef struct {
 	uint8 Reserved;
 	uint8 Flags;
 	uint16 Base_High;
-} IDT_Entry;
+} __attribute__((packed)) IDT_Entry;
 
 typedef struct{
 	uint16 Limit;
 	IDT_Entry* Base;
-} IDT_Descriptor;
+} __attribute__((packed)) IDT_Descriptor;
 
 typedef enum{
 	TASK_GATE		= 0x05,
@@ -31,7 +31,7 @@ typedef enum{
 	PRIVILAGE_3		= 0x60,
 
 	PRESENT			= 0x80
-} IDT_FLAGS;
+} __attribute__((packed)) IDT_FLAGS;
 
 void LoadIDT();
 void SetEntry(int interrupt, uint32 base, uint16 gdt_selector, uint8 flags);

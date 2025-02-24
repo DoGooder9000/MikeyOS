@@ -11,23 +11,24 @@ void ClearScreen(){
 	}
 }
 
-int Print(char* msg, uint8 color, int start_offset){
-	uint8* VidMemAddr = (uint8 *)VIDEO_MEMORY + start_offset * 2;
-	int char_offset = start_offset;
+int Print(char* msg, uint8 color, int start_offset){	// start_offset is in characters, not bytes
+	uint8* vid_addr = (uint8*)VIDEO_MEMORY + (start_offset*2);
+	int cursor_pos = start_offset;	// cursor_pos is in characters not bytes
 
-	for(int i = 0; i < strlen(msg); i++){
+	for (int i=0; i<strlen(msg); i++){
 		if (msg[i] == '\n'){
-			char_offset = NewLine(char_offset);
+			cursor_pos = NewLine(cursor_pos);
 			continue;
 		}
 
-		VidMemAddr[char_offset*2] = msg[i]; // Set character
-		VidMemAddr[char_offset*2 + 1] = color; // Set attribute byte
+		vid_addr[0] = msg[i];
+		vid_addr[1] = color;
 
-		char_offset++;
+		vid_addr += 2;
+		cursor_pos++;
 	}
 
-	return char_offset;
+	return cursor_pos;
 }
 
 int StartOfLine(int char_offset){

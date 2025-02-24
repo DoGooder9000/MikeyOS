@@ -1,5 +1,22 @@
 {
 	"files.associations": {
-		"kernel.h": "c"
+		"kernel.h": "c",
+		"ratio": "c",
+		"array": "c",
+		"chrono": "c",
+		"deque": "c",
+		"forward_list": "c",
+		"string": "c",
+		"unordered_map": "c",
+		"vector": "c",
+		"string_view": "c",
+		"format": "c",
+		"initializer_list": "c",
+		"span": "c",
+		"text_encoding": "c",
+		"__bit_reference": "c",
+		"__hash_table": "c",
+		"__split_buffer": "c",
+		"ios": "c"
 	}
 }
