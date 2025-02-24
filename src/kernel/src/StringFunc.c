@@ -1,4 +1,4 @@
-#include "headers/kernel.h"
+#include "headers/string.h"
 
 int strlen(const char* str){
 	int len = 0;

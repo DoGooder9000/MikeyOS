@@ -6,11 +6,15 @@ BUILD_DIR ?= build
 TEMP_DIR = tmp
 
 SRC = src
+ASM_DIR = $(SRC)/asm
 HEADERS = $(SRC)/headers
 
 C_SRCS = $(wildcard $(SRC)/*.c)
 C_OBJS = $(patsubst $(SRC)/%.c, $(TEMP_DIR)/%.o, $(C_SRCS))
 C_HEADERS = $(wildcard $(HEADERS)/*.h)
+
+ASM_SRCS = $(wildcard $(ASM_DIR)/*.asm)
+ASM_OBJS = $(patsubst $(ASM_DIR)/%.asm, $(TEMP_DIR)/%.o, $(ASM_SRCS))
 
 .PHONY: all asmKernel Kernel clean
 

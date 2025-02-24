@@ -1,4 +1,6 @@
-#include "headers/kernel.h"
+#include "headers/video.h"
+#include "headers/stdint.h"
+#include "headers/string.h"
 
 void ClearScreen(){
 	char *VidMemAddr = (char *)VIDEO_MEMORY;
@@ -9,11 +11,11 @@ void ClearScreen(){
 	}
 }
 
-void Print(char* msg, int msg_len, uint8 color, int start_offset){
+int Print(char* msg, uint8 color, int start_offset){
 	uint8* VidMemAddr = (uint8 *)VIDEO_MEMORY + start_offset * 2;
 	int char_offset = start_offset;
 
-	for(int i = 0; i < msg_len; i++){
+	for(int i = 0; i < strlen(msg); i++){
 		if (msg[i] == '\n'){
 			char_offset = NewLine(char_offset);
 			continue;
@@ -24,6 +26,8 @@ void Print(char* msg, int msg_len, uint8 color, int start_offset){
 
 		char_offset++;
 	}
+
+	return char_offset;
 }
 
 int StartOfLine(int char_offset){
